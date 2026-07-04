@@ -1,0 +1,191 @@
+{
+  "canonical": [
+    {
+      "description": "key order and nesting",
+      "input": {
+        "b": 2,
+        "a": 1,
+        "nested": {
+          "z": [
+            1,
+            2,
+            3
+          ],
+          "y": null
+        }
+      },
+      "canonical": "{\"a\":1,\"b\":2,\"nested\":{\"y\":null,\"z\":[1,2,3]}}",
+      "sha256": "f623b1cc1b379b1ebcffe98d98969fb154114280d46049c339b71ed78ff150a0"
+    },
+    {
+      "description": "unicode passes through unescaped (ensure_ascii=False)",
+      "input": {
+        "emoji": "🚀",
+        "greeting": "héllo ✓",
+        "cjk": "日本語"
+      },
+      "canonical": "{\"cjk\":\"日本語\",\"emoji\":\"🚀\",\"greeting\":\"héllo ✓\"}",
+      "sha256": "7d67511a34fc80165980ae5ac931cf27dad1a50627b04cb641f8a47fa8ad4320"
+    },
+    {
+      "description": "empty containers",
+      "input": {
+        "empty_dict": {},
+        "empty_list": []
+      },
+      "canonical": "{\"empty_dict\":{},\"empty_list\":[]}",
+      "sha256": "8600a0d5676331742e3e74e9ff159ebf2e0a0e9384cc9678a178ebd7e15cb3f1"
+    },
+    {
+      "description": "scalar soup",
+      "input": [
+        true,
+        false,
+        null,
+        0,
+        -17,
+        3.5,
+        1e+100,
+        "x"
+      ],
+      "canonical": "[true,false,null,0,-17,3.5,1e+100,\"x\"]",
+      "sha256": "6794ac7d57220322ecb36f91c573751738d6421aa0df462fa35f6d310b82b3e2"
+    },
+    {
+      "description": "big int survives exactly",
+      "input": {
+        "n": 18446744073709551616
+      },
+      "canonical": "{\"n\":18446744073709551616}",
+      "sha256": "5171b3f02739553257cde342c54398ac7f809898b9fbce52c1b40f7ff07c5d22"
+    },
+    {
+      "description": "control characters and quotes are escaped",
+      "input": {
+        "s": "line1\nline2\t\"quoted\" back\\slash"
+      },
+      "canonical": "{\"s\":\"line1\\nline2\\t\\\"quoted\\\" back\\\\slash\"}",
+      "sha256": "96914e8d3b913d4f317e9306f7882c76ab0a5a32caae46d2660bf56b5d1d5e36"
+    },
+    {
+      "description": "float canonicalization via repr",
+      "input": {
+        "f": 0.1
+      },
+      "canonical": "{\"f\":0.1}",
+      "sha256": "59e0492137bd5891160f9f69bb080ca4eb7d63f34cf4cc1d22661c11911eec8a"
+    }
+  ],
+  "argument_hash": [
+    {
+      "description": "llm_call",
+      "event_type": "llm_call",
+      "name": "llm_plan",
+      "payload": {
+        "prompt": "Plan the task",
+        "temperature": 0
+      },
+      "sha256": "f769c9777d00cee85103bb9a95c12eb1021c74d7afc93306c46fe9f4bc44afbe"
+    },
+    {
+      "description": "tool_call",
+      "event_type": "tool_call",
+      "name": "lookup_customer",
+      "payload": {
+        "customer_id": 123
+      },
+      "sha256": "5160e60cc68581b656c2780267788e4c17dcfdf930a4ffb4bd176fe8c5a5dbaa"
+    },
+    {
+      "description": "root_input (name is null)",
+      "event_type": "root_input",
+      "name": null,
+      "payload": {
+        "query": "Look up customer 123 and summarize their last 5 orders."
+      },
+      "sha256": "54550f32b8e2f0e728a6281183463b8ac09703044fb58421c025717a9ef279e0"
+    },
+    {
+      "description": "final_output (name is null)",
+      "event_type": "final_output",
+      "name": null,
+      "payload": {
+        "answer": "Customer 123 has 5 recent orders."
+      },
+      "sha256": "18a1efe82e41b945a423cf2822269c472766d5bc68f0113bce95beb34e06f351"
+    }
+  ],
+  "context_hash": [
+    {
+      "description": "root_input: no parents, no response",
+      "parent_context_hashes": [],
+      "event_type": "root_input",
+      "name": null,
+      "payload": {
+        "query": "Look up customer 123 and summarize their last 5 orders."
+      },
+      "historical_response": null,
+      "status": "ok",
+      "error": null,
+      "sha256": "998205bfa979172af4a8ded8da704003c7f952c72fe1555772579b33ea6309fb"
+    },
+    {
+      "description": "llm_call chained to root (one parent)",
+      "parent_context_hashes": [
+        "998205bfa979172af4a8ded8da704003c7f952c72fe1555772579b33ea6309fb"
+      ],
+      "event_type": "llm_call",
+      "name": "llm_plan",
+      "payload": {
+        "prompt": "Plan the task",
+        "temperature": 0
+      },
+      "historical_response": {
+        "plan": [
+          "lookup_customer",
+          "fetch_orders"
+        ]
+      },
+      "status": "ok",
+      "error": null,
+      "sha256": "ff43eba806c0cdfacf90b7be1651d58e42e52ab42afa025191fce77cb7ef5799"
+    },
+    {
+      "description": "failed tool_call: status=error, error dict hashed, null response",
+      "parent_context_hashes": [
+        "ff43eba806c0cdfacf90b7be1651d58e42e52ab42afa025191fce77cb7ef5799"
+      ],
+      "event_type": "tool_call",
+      "name": "fetch_orders",
+      "payload": {
+        "customer_id": 123,
+        "limit": 5
+      },
+      "historical_response": null,
+      "status": "error",
+      "error": {
+        "type": "KeyError",
+        "message": "'orders'"
+      },
+      "sha256": "438894d6c440057f5e6d07e5979049e4b30e8f54a5402f5dfcd5c00230100e01"
+    },
+    {
+      "description": "llm_call with two parents in pinned order",
+      "parent_context_hashes": [
+        "ff43eba806c0cdfacf90b7be1651d58e42e52ab42afa025191fce77cb7ef5799",
+        "438894d6c440057f5e6d07e5979049e4b30e8f54a5402f5dfcd5c00230100e01"
+      ],
+      "event_type": "llm_call",
+      "name": "llm_summary",
+      "payload": {
+        "prompt": "Summarize the orders"
+      },
+      "historical_response": {
+        "text": "Customer 123 has 5 recent orders."
+      },
+      "status": "ok",
+      "error": null,
+      "sha256": "40ded9cdf576094ab4d5072c59e1ae06a0a598a5e2c372b2c57f12e69d3a4290"
+    }
+  ]
+}
