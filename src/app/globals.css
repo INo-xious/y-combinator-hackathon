@@ -1,0 +1,224 @@
+@import "tailwindcss";
+@import "@xyflow/react/dist/style.css";
+
+@theme {
+  --color-brand-bg: #070B13;
+  --color-brand-card: #0E1321;
+  --color-brand-border: #1B2336;
+  --color-brand-primary: #3B82F6;
+  --color-brand-success: #10B981;
+  --color-brand-recording: #F59E0B;
+  --color-brand-divergence: #EF4444;
+  --color-brand-hash: #8B5CF6;
+  --color-brand-text: #FFFFFF;
+  --color-brand-secondary: #94A3B8;
+  
+  --animate-pulse-slow: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-border-glow: border-glow 2s linear infinite;
+  --animate-glow-blue: glow-blue 2s ease-in-out infinite;
+  --animate-glow-purple: glow-purple 2s ease-in-out infinite;
+  --animate-glow-green: glow-green 2s ease-in-out infinite;
+  --animate-glow-yellow: glow-yellow 2s ease-in-out infinite;
+  --animate-glow-red: glow-red 2s ease-in-out infinite;
+  --animate-gradient-x: gradient-x 3s ease infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-shimmer: shimmer 2s linear infinite;
+  
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .85; transform: scale(1.015); }
+  }
+  @keyframes border-glow {
+    0%, 100% { border-color: rgba(59, 130, 246, 0.4); box-shadow: 0 0 8px rgba(59, 130, 246, 0.15); }
+    50% { border-color: rgba(59, 130, 246, 0.85); box-shadow: 0 0 16px rgba(59, 130, 246, 0.4); }
+  }
+  @keyframes glow-blue {
+    0%, 100% { border-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 4px rgba(59, 130, 246, 0.1); }
+    50% { border-color: rgba(59, 130, 246, 0.85); box-shadow: 0 0 16px rgba(59, 130, 246, 0.4); }
+  }
+  @keyframes glow-purple {
+    0%, 100% { border-color: rgba(139, 92, 246, 0.3); box-shadow: 0 0 4px rgba(139, 92, 246, 0.1); }
+    50% { border-color: rgba(139, 92, 246, 0.85); box-shadow: 0 0 16px rgba(139, 92, 246, 0.4); }
+  }
+  @keyframes glow-green {
+    0%, 100% { border-color: rgba(16, 185, 129, 0.3); box-shadow: 0 0 4px rgba(16, 185, 129, 0.1); }
+    50% { border-color: rgba(16, 185, 129, 0.85); box-shadow: 0 0 16px rgba(16, 185, 129, 0.4); }
+  }
+  @keyframes glow-yellow {
+    0%, 100% { border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 0 4px rgba(245, 158, 11, 0.1); }
+    50% { border-color: rgba(245, 158, 11, 0.85); box-shadow: 0 0 16px rgba(245, 158, 11, 0.4); }
+  }
+  @keyframes glow-red {
+    0%, 100% { border-color: rgba(239, 68, 68, 0.3); box-shadow: 0 0 4px rgba(239, 68, 68, 0.1); }
+    50% { border-color: rgba(239, 68, 68, 0.85); box-shadow: 0 0 16px rgba(239, 68, 68, 0.4); }
+  }
+  @keyframes gradient-x {
+    0%, 100% { background-size: 200% 200%; background-position: left center; }
+    50% { background-size: 200% 200%; background-position: right center; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+}
+
+:root {
+  --background: #030306;
+  --foreground: #FFFFFF;
+}
+
+body {
+  background-color: #030306;
+  color: #FFFFFF;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar styled for premium dark theme */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #030306;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Lenis smooth scroll base styles */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
+/* React Flow Overrides for Dark Premium Aesthetic */
+.react-flow {
+  background-color: #0B1220 !important;
+}
+
+.react-flow__background {
+  background-color: #0B1220 !important;
+}
+
+.react-flow__node {
+  border-radius: 12px !important;
+  border: 1px solid #1F2937 !important;
+  background-color: #111827 !important;
+  padding: 0 !important;
+  color: #FFFFFF !important;
+}
+
+.react-flow__edge-path {
+  stroke: #1F2937 !important;
+  stroke-width: 2px !important;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke: #3B82F6 !important;
+  stroke-dasharray: 5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  from {
+    stroke-dashoffset: 20;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(17, 24, 39, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(31, 41, 55, 0.6);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(17, 24, 39, 0.85);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Shake animation for divergence alerts */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* Gradient text animation */
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+}
+
+/* Float animation */
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Premium range slider styling */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #3B82F6;
+  cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+  transition: box-shadow 0.2s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+}
+
+/* Selection color */
+::selection {
+  background: rgba(59, 130, 246, 0.2);
+}
