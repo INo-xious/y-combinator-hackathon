@@ -8,7 +8,7 @@ Wrap a session once:
     http = wrap_requests(requests.Session())
     response = http.get("https://api.example.com/orders", timeout=10)
 
-Inside an Agent-RR capture context, every request is recorded as a
+Inside an Agent-M² capture context, every request is recorded as a
 ``tool_call`` event — method, URL, params, headers (sensitive ones redacted
 by default), body, response status/headers/body, and latency. During replay
 the recorded response is served as a :class:`ReplayedHTTPResponse` and the
@@ -107,7 +107,7 @@ class _RequestsSessionProxy:
         return self._target.__exit__(exc_type, exc, tb)
 
     def __repr__(self) -> str:
-        return f"<AgentRRRequestsProxy target={self._target!r}>"
+        return f"<AgentM2RequestsProxy target={self._target!r}>"
 
     def _capture_request(self, method: str, url: str, **kwargs: Any) -> Any:
         rr = get_active_rr()
@@ -115,7 +115,7 @@ class _RequestsSessionProxy:
             return self._target.request(method, url, **kwargs)
         if kwargs.get("stream") is True:
             raise NotImplementedError(
-                "Agent-RR requests wrapper does not capture streamed downloads yet"
+                "Agent-M² requests wrapper does not capture streamed downloads yet"
             )
 
         payload = self._build_payload(method, url, kwargs)

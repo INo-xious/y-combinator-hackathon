@@ -299,7 +299,7 @@ class Replayer:
         if self._require_signatures and self._signing_key is None:
             raise ValueError(
                 "require_signatures=True needs a signing key: pass signing_key "
-                "or set AGENT_RR_SIGNING_KEY"
+                "or set AGENT_M2_SIGNING_KEY"
             )
         self._mode = mode
         self._semantic_matcher = semantic_matcher

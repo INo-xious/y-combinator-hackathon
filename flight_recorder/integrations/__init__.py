@@ -1,4 +1,4 @@
-"""Optional framework integrations for Agent-RR.
+"""Optional framework integrations for Agent-M².
 
 These modules avoid hard dependencies on LangChain, OpenAI, Anthropic,
 LiteLLM, and requests. Import the wrapper for the framework you use

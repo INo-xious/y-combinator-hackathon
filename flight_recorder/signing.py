@@ -16,7 +16,7 @@ Signatures are computed after hashing and are never hashed themselves.
 Unsigned traces are unaffected: no key means no ``signature`` field and
 byte-identical output to previous versions.
 
-Key resolution order: explicit argument, then the ``AGENT_RR_SIGNING_KEY``
+Key resolution order: explicit argument, then the ``AGENT_M2_SIGNING_KEY``
 environment variable, then no signing at all.
 """
 
@@ -32,7 +32,7 @@ from .hashing import canonical_json
 if TYPE_CHECKING:
     from .events import TraceEvent
 
-SIGNING_KEY_ENV_VAR = "AGENT_RR_SIGNING_KEY"
+SIGNING_KEY_ENV_VAR = "AGENT_M2_SIGNING_KEY"
 
 
 def resolve_signing_key(key: Union[bytes, str, None]) -> Optional[bytes]:

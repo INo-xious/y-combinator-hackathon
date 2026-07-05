@@ -5,7 +5,7 @@ Wrap an official SDK client once:
     client = wrap_anthropic(Anthropic())
 
 Calls to ``client.messages.create(...)`` are recorded/replayed when an
-Agent-RR capture context is active. Outside that context, calls pass through.
+Agent-M² capture context is active. Outside that context, calls pass through.
 
 ``messages.create(stream=True)`` is supported: message events are buffered
 and aggregated deterministically during record, and replay yields a synthetic
@@ -90,7 +90,7 @@ class _AnthropicProxy:
         setattr(self._target, name, value)
 
     def __repr__(self) -> str:
-        return f"<AgentRRAnthropicProxy target={self._target!r}>"
+        return f"<AgentM2AnthropicProxy target={self._target!r}>"
 
 
 def _capture_create(
@@ -142,7 +142,7 @@ def _refuse_in_capture_context(target: Callable[..., Any], endpoint: str) -> Cal
         if get_active_rr() is None:
             return target(*args, **kwargs)
         raise NotImplementedError(
-            f"Agent-RR does not capture {endpoint} yet; "
+            f"Agent-M² does not capture {endpoint} yet; "
             "use messages.create(stream=True) instead"
         )
 

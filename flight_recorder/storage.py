@@ -136,7 +136,7 @@ def _event_from_line(
         if cipher is None:
             raise ValueError(
                 f"encrypted trace {path}: line {line_number} needs a cipher — "
-                "pass cipher=... (or set AGENT_RR_ENCRYPTION_KEY for the CLI)"
+                "pass cipher=... (or set AGENT_M2_ENCRYPTION_KEY for the CLI)"
             )
         try:
             data = decrypt_event_fields(data, cipher)

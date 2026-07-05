@@ -9,7 +9,7 @@ than a client object, so this wrapper wraps callables, not attribute paths:
     llm = wrap_litellm(litellm)      # or wrap_litellm() to import it lazily
     response = llm.completion(model="gpt-4o-mini", messages=[...])
 
-Calls are recorded/replayed when an Agent-RR capture context is active and
+Calls are recorded/replayed when an Agent-M² capture context is active and
 pass through unchanged outside one. LiteLLM normalizes responses (and
 streaming chunks) to the OpenAI format, so streaming reuses the OpenAI
 chunk aggregation.
@@ -96,7 +96,7 @@ class _LiteLLMProxy:
         setattr(self._target, name, value)
 
     def __repr__(self) -> str:
-        return f"<AgentRRLiteLLMProxy target={self._target!r}>"
+        return f"<AgentM2LiteLLMProxy target={self._target!r}>"
 
 
 def _capture_function(

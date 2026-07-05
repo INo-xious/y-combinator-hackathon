@@ -5,7 +5,7 @@ Wrap an official SDK client once:
     client = wrap_openai(OpenAI())
 
 Calls to ``client.responses.create(...)``, ``client.chat.completions.create(...)``
-and ``client.embeddings.create(...)`` are recorded/replayed when an Agent-RR
+and ``client.embeddings.create(...)`` are recorded/replayed when an Agent-M²
 capture context is active. Outside that context, calls pass through unchanged.
 
 ``stream=True`` calls are supported: chunks are buffered and aggregated
@@ -84,7 +84,7 @@ class _OpenAIProxy:
         setattr(self._target, name, value)
 
     def __repr__(self) -> str:
-        return f"<AgentRROpenAIProxy target={self._target!r}>"
+        return f"<AgentM2OpenAIProxy target={self._target!r}>"
 
 
 def _capture_create(

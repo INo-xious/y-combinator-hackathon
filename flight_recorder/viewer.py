@@ -1,4 +1,4 @@
-"""Self-contained HTML renderer for a trace's causal DAG (``agent-rr view``).
+"""Self-contained HTML renderer for a trace's causal DAG (``agent-m2 view``).
 
 Produces one dependency-free HTML file: layered DAG layout computed here in
 Python (longest-path-from-root layering), rendered as absolutely-positioned
@@ -76,7 +76,7 @@ pre { font-size: 12px; background: #f1f5f9; padding: 8px; border-radius: 6px; ov
 
 _JS = """
 document.addEventListener("DOMContentLoaded", () => {
-  const rawData = document.getElementById('agent-rr-trace-data').textContent;
+  const rawData = document.getElementById('agent-m2-trace-data').textContent;
   const NODES = JSON.parse(rawData);
   const detail = document.getElementById('detail');
   let selected = null;
@@ -189,12 +189,12 @@ def render_trace_html(events: list[TraceEvent], trace_name: str) -> str:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent-RR · {html.escape(trace_name)}</title>
+<title>Agent-M² · {html.escape(trace_name)}</title>
 <style>{_CSS}</style>
 </head>
 <body>
 <header>
-  <h1>✈️ Agent-RR causal DAG — {html.escape(trace_name)}</h1>
+  <h1>✈️ Agent-M² causal DAG — {html.escape(trace_name)}</h1>
   {meta_bits}
   <span class="meta">{len(drawable)} events · click a node for details</span>
 </header>
@@ -211,7 +211,7 @@ def render_trace_html(events: list[TraceEvent], trace_name: str) -> str:
   {''.join(node_divs)}
 </div>
 <div id="detail"><h2 id="detail-title"></h2><pre id="detail-body"></pre></div>
-<script type="application/json" id="agent-rr-trace-data">
+<script type="application/json" id="agent-m2-trace-data">
 {safe_json}
 </script>
 <script>{_JS}</script>

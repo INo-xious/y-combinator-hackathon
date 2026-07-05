@@ -1,4 +1,4 @@
-"""agent-rr CLI entry point: record, replay, and validate commands.
+"""agent-m2 CLI entry point: record, replay, and validate commands.
 
 The CLI is deliberately a thin proof surface over the library APIs: it runs a
 deterministic in-process demo agent for ``record``/``replay`` and performs full
@@ -157,7 +157,7 @@ def _run_validate(trace_file: Path, *, require_signatures: bool = False) -> int:
     # leak the secret into shell history and process listings.
     signing_key = resolve_signing_key(None)
     try:
-        # Encrypted traces decrypt with the AGENT_RR_ENCRYPTION_KEY env var;
+        # Encrypted traces decrypt with the AGENT_M2_ENCRYPTION_KEY env var;
         # without it, reading one fails with a message naming that variable.
         events = read_events(trace_file, cipher=load_fernet_cipher())
         validate_trace(events, require_complete=True)
@@ -165,7 +165,7 @@ def _run_validate(trace_file: Path, *, require_signatures: bool = False) -> int:
         signatures_verified: Optional[bool] = None
         if require_signatures and signing_key is None:
             raise ValueError(
-                "--require-signatures needs a signing key: set AGENT_RR_SIGNING_KEY"
+                "--require-signatures needs a signing key: set AGENT_M2_SIGNING_KEY"
             )
         if signing_key is not None:
             verify_signatures(events, signing_key, require=require_signatures)
@@ -232,7 +232,7 @@ def _run_view(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="agent-rr",
+        prog="agent-m2",
         description="Record, replay, and validate deterministic agent traces.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -254,7 +254,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--require-signatures",
         action="store_true",
         help="fail unless every event carries a valid HMAC signature "
-        "(key from AGENT_RR_SIGNING_KEY; never a flag, to keep it out of "
+        "(key from AGENT_M2_SIGNING_KEY; never a flag, to keep it out of "
         "shell history)",
     )
 
@@ -278,7 +278,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Entry point for the ``agent-rr`` console script."""
+    """Entry point for the ``agent-m2`` console script."""
     parser = _build_parser()
     try:
         args = parser.parse_args(argv)

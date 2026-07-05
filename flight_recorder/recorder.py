@@ -35,7 +35,7 @@ redactor to the Replayer for hash parity.
 who need cross-language hash exactness (store ``float_hex`` strings instead);
 pass the same policy to the Replayer, like the redactor.
 
-``signing_key`` (or the ``AGENT_RR_SIGNING_KEY`` env var) enables optional
+``signing_key`` (or the ``AGENT_M2_SIGNING_KEY`` env var) enables optional
 HMAC-SHA256 signing: every event gets a ``signature`` field so later
 tampering with the trace file is detectable (see ``signing.py``).
 

@@ -14,7 +14,7 @@ satisfies the :class:`Cipher` protocol, so custom KMS-backed ciphers plug in
 the same way.
 
 Key resolution mirrors signing: explicit argument, then the
-``AGENT_RR_ENCRYPTION_KEY`` environment variable.
+``AGENT_M2_ENCRYPTION_KEY`` environment variable.
 
 TODO: field-level selective encryption, key rotation, and encrypting
 ``error.message`` / ``error.traceback``.
@@ -29,7 +29,7 @@ from typing import Any, Optional, Protocol, Union
 from .hashing import canonical_json
 
 ENCRYPTED_MARKER = "__agent_rr_encrypted__"
-ENCRYPTION_KEY_ENV_VAR = "AGENT_RR_ENCRYPTION_KEY"
+ENCRYPTION_KEY_ENV_VAR = "AGENT_M2_ENCRYPTION_KEY"
 
 # The fields encrypted at rest. Hashes/signature stay plaintext (they are
 # one-way digests computed pre-encryption); error dicts are TODO (see above).
@@ -104,7 +104,7 @@ class _FernetCipher:
 
 
 def load_fernet_cipher(key: Union[bytes, str, None] = None) -> Optional[_FernetCipher]:
-    """Build a Fernet cipher from *key* or ``AGENT_RR_ENCRYPTION_KEY``.
+    """Build a Fernet cipher from *key* or ``AGENT_M2_ENCRYPTION_KEY``.
 
     Returns None when no key is configured. Requires the optional
     ``cryptography`` dependency (``pip install flight-recorder[crypto]``);

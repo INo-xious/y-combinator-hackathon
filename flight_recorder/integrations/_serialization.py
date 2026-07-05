@@ -26,7 +26,7 @@ class AttrDict(dict):
 def to_jsonable(value: Any) -> Any:
     """Convert common SDK/framework objects into strict JSON-compatible data.
 
-    Values already accepted by Agent-RR's canonical JSON validator are returned
+    Values already accepted by Agent-M²'s canonical JSON validator are returned
     unchanged. Objects from Pydantic-style SDKs are converted through
     ``model_dump(mode="json")`` when available.
     """
