@@ -15,8 +15,7 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
-from typing import Iterator, Union
-
+from typing import Iterator, Union, Literal
 from .events import TraceEvent
 
 
@@ -55,7 +54,7 @@ class TraceWriter:
     def __enter__(self) -> "TraceWriter":
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> bool:
+    def __exit__(self, exc_type, exc, tb) -> Literal[False]:
         self.close()
         return False
 
@@ -74,7 +73,9 @@ def iter_events(path: Union[str, Path]) -> Iterator[TraceEvent]:
     with path.open(encoding="utf-8") as file:
         for line_number, line in enumerate(file, start=1):
             if pending_line is not None:
-                yield _event_from_line(path, pending_line_number, pending_line, is_final=False)
+                event = _event_from_line(path, pending_line_number, pending_line, is_final=False)
+                assert event is not None
+                yield event
             pending_line = line
             pending_line_number = line_number
     if pending_line is not None:

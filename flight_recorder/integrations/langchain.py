@@ -160,7 +160,7 @@ def _invoke_graph(graph: Any, payload: Any) -> Any:
 
 def _make_runnable(func: Callable[..., Any], *, name: str) -> Any:
     try:
-        from langchain_core.runnables import RunnableLambda
+        from langchain_core.runnables import RunnableLambda  # type: ignore[import-not-found,import-untyped]
     except Exception:
         return _RunnableAdapter(func, name=name)
 

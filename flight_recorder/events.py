@@ -191,18 +191,20 @@ class TraceEvent:
     def _validate_error_dict(self) -> None:
         if type(self.error) is not dict:
             _fail("error must be a dict when status is 'error'")
-        unknown = set(self.error) - _ERROR_ALLOWED_KEYS
+        error_dict = self.error
+        assert error_dict is not None
+        unknown = set(error_dict) - _ERROR_ALLOWED_KEYS
         if unknown:
             _fail(
                 f"error has unsupported keys {sorted(map(repr, unknown))}; "
                 "allowed: type, message, traceback"
             )
         for key in ("type", "message"):
-            if key not in self.error or type(self.error[key]) is not str:
+            if key not in error_dict or type(error_dict[key]) is not str:
                 _fail(f"error.{key} is required and must be a string")
-        if not self.error["type"]:
+        if not error_dict["type"]:
             _fail("error.type must be a non-empty string")
-        if "traceback" in self.error and type(self.error["traceback"]) is not str:
+        if "traceback" in error_dict and type(error_dict["traceback"]) is not str:
             _fail("error.traceback must be a string when present")
 
     def _validate_metadata_payload(self) -> None:

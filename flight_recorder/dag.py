@@ -28,7 +28,7 @@ final_output events are present (CLI ``validate`` semantics).
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, NoReturn
 
 from .events import (
     EVENT_TYPE_FINAL_OUTPUT,
@@ -39,7 +39,7 @@ from .events import (
 from .hashing import argument_hash, context_hash, new_validation_cache
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     raise ValueError(f"invalid trace: {message}")
 
 
@@ -151,7 +151,7 @@ def verify_hashes(events: Iterable[TraceEvent]) -> None:
                 f"{event.call_sequence_index}): stored {event.argument_hash}, "
                 f"recomputed {expected_argument}"
             )
-        parent_hashes = []
+        parent_hashes: list[str] = []
         for parent_id in event.parent_event_ids:
             parent = by_id.get(parent_id)
             if parent is None or parent.context_hash is None:

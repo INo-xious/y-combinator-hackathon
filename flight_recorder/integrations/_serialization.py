@@ -117,7 +117,7 @@ def from_jsonable(value: Any) -> Any:
 
 def _langchain_message_to_json(value: Any) -> dict | None:
     try:
-        from langchain_core.messages import BaseMessage, message_to_dict
+        from langchain_core.messages import BaseMessage, message_to_dict  # type: ignore[import-not-found,import-untyped]
     except Exception:
         return None
 

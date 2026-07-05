@@ -1,6 +1,5 @@
 """Tests for the Recorder: lifecycle enforcement, flushing, error recording (PLAN §2)."""
 
-import json
 import uuid
 
 import pytest

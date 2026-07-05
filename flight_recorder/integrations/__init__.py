@@ -6,4 +6,4 @@ installed, local fakes that expose ``.invoke`` / ``.create`` still work in
 tests and demos.
 """
 
-__all__ = []
+__all__: list[str] = []

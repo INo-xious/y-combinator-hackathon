@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import builtins
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Union, Literal, NoReturn
 
 from .dag import validate_trace, verify_hashes
 from .errors import (
@@ -332,7 +332,7 @@ class Replayer:
         self._entered = True
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> bool:
+    def __exit__(self, exc_type, exc, tb) -> Literal[False]:
         self._closed = True
         if exc_type is None:
             if not self._final_output_called:
@@ -444,6 +444,7 @@ class Replayer:
         *,
         final: bool = False,
     ) -> TraceEvent:
+        assert self._events is not None
         # Hashing validates strict JSON before anything else, same as the
         # recorder: an unrecordable payload fails before any comparison.
         computed_hash = argument_hash(event_type, name, redacted_payload)
@@ -462,6 +463,7 @@ class Replayer:
             )
 
         candidate = self._events[self._next_index]
+        reason: str | None = None
         if candidate.event_type != event_type:
             reason = "event_type mismatch"
         elif candidate.name != name:
@@ -573,7 +575,8 @@ class Replayer:
                 labels.append(label)
         return labels
 
-    def _reraise_historical_error(self, event: TraceEvent) -> None:
+    def _reraise_historical_error(self, event: TraceEvent) -> NoReturn:
+        assert event.error is not None
         error_type = event.error["type"]
         message = event.error["message"]
         candidate = getattr(builtins, error_type, None)
@@ -669,6 +672,7 @@ class TopologicalReplayer(Replayer):
 
     def __enter__(self) -> "TopologicalReplayer":
         super().__enter__()
+        assert self._events is not None
         self._scheduler = DagScheduler(self._events)
         return self
 
@@ -696,6 +700,7 @@ class TopologicalReplayer(Replayer):
         *,
         final: bool = False,
     ) -> TraceEvent:
+        assert self._scheduler is not None
         # Hashing validates strict JSON before anything else (recorder parity).
         computed_hash = argument_hash(event_type, name, redacted_payload)
         actual = _request_summary(event_type, name, redacted_payload, computed_hash, parents)
@@ -727,6 +732,7 @@ class TopologicalReplayer(Replayer):
                 reason = self._payload_mismatch_reason(
                     near[0], computed_hash, redacted_payload, final=final
                 )
+                assert reason is not None
                 error_cls = FinalOutputMismatch if final else ReplayDivergence
                 self._fail_divergence(
                     error_cls(

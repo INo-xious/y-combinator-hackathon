@@ -42,7 +42,7 @@ import traceback
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 from .capture import CapturedResponse
 from .errors import FinalOutputNotCalled, LifecycleError
@@ -154,7 +154,7 @@ class Recorder:
         self._entered = True
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> bool:
+    def __exit__(self, exc_type, exc, tb) -> Literal[False]:
         self._closed = True
         try:
             if exc_type is None and self._final_event_id is None:
@@ -163,7 +163,8 @@ class Recorder:
                     "was never called"
                 )
         finally:
-            self._writer.close()
+            if self._writer is not None:
+                self._writer.close()
         # An exception from agent code propagates unchanged; the final-output
         # assertion above only runs on the clean-exit path, so we never mask
         # the user's exception with our own.
@@ -361,6 +362,7 @@ class Recorder:
             error,
             validation_cache=validation_cache,
         )
+        assert self._run_id is not None
         event = TraceEvent(
             event_id=str(uuid.uuid4()),
             run_id=self._run_id,
@@ -378,10 +380,11 @@ class Recorder:
             context_hash=ctx_hash,
             latency_ms=latency_ms,
         )
-        event._validation_cache = validation_cache
+        event._validation_cache = validation_cache  # type: ignore[attr-defined]
         return event
 
     def _write(self, event: TraceEvent) -> None:
+        assert self._writer is not None
         self._writer.append(event)  # validates, writes one line, flushes
         if event.context_hash is not None:
             self._context_hashes[event.event_id] = event.context_hash
