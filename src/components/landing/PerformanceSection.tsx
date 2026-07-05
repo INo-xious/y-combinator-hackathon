@@ -6,11 +6,6 @@ import { TrendingUp, Gauge, Shield, Coins } from 'lucide-react';
 import SectionHeader from '@/components/shared/SectionHeader';
 import AnimatedCounter from '@/components/shared/AnimatedCounter';
 
-/**
- * PerformanceSection — Showcases key metrics with animated counters
- * and elegant stat cards. Scroll-triggered animations.
- */
-
 const metrics = [
   {
     icon: <Coins className="w-5 h-5" />,
@@ -56,23 +51,23 @@ const metrics = [
 
 export default function PerformanceSection() {
   return (
-    <section className="relative py-32 overflow-hidden">
+    <section className="relative py-36 overflow-hidden">
       {/* Top divider */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
       
       {/* Subtle grid background */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:6rem_6rem] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_30%,transparent_100%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[size:6rem_6rem] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_20%,transparent_100%)] pointer-events-none" />
 
-      <div className="max-w-6xl mx-auto px-6">
+      <div className="max-w-6xl mx-auto px-6 relative z-10">
         <SectionHeader
           badge="Performance"
           badgeIcon={<TrendingUp className="w-3.5 h-3.5" />}
           badgeColor="blue"
           title="Numbers that matter"
-          subtitle="Agent-RR is engineered for speed, reliability, and cost efficiency at every layer of the debugging stack."
+          subtitle="M² is engineered for speed, reliability, and cost efficiency at every layer of the debugging stack."
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12">
           {metrics.map((metric, index) => (
             <motion.div
               key={index}
@@ -84,19 +79,19 @@ export default function PerformanceSection() {
                 delay: index * 0.1,
                 ease: [0.21, 0.45, 0.27, 0.9],
               }}
-              className={`relative rounded-2xl border ${metric.borderColor} bg-white/[0.02] p-8 text-center group hover:bg-white/[0.04] transition-all duration-500 overflow-hidden`}
+              className={`relative rounded-3xl border ${metric.borderColor} bg-white/[0.01] p-8 text-center group hover:bg-white/[0.03] transition-all duration-500 overflow-hidden shadow-xl`}
             >
               {/* Background gradient */}
               <div className={`absolute inset-0 bg-gradient-to-b ${metric.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`} />
               
               <div className="relative">
                 {/* Icon */}
-                <div className={`${metric.color} mx-auto mb-4`}>
+                <div className={`${metric.color} mx-auto mb-5`}>
                   {metric.icon}
                 </div>
 
                 {/* Animated number */}
-                <div className={`text-5xl font-bold font-[family-name:var(--font-display)] ${metric.color} mb-2`}>
+                <div className={`text-5xl font-bold font-[family-name:var(--font-display)] ${metric.color} mb-3`}>
                   <AnimatedCounter
                     target={metric.target}
                     suffix={metric.suffix}
@@ -105,11 +100,11 @@ export default function PerformanceSection() {
                 </div>
 
                 {/* Label */}
-                <div className="text-sm font-semibold text-white mb-2">
+                <div className="text-sm font-bold text-white mb-2">
                   {metric.label}
                 </div>
 
-                <p className="text-xs text-white/30 leading-relaxed">
+                <p className="text-xs text-white/30 leading-relaxed font-sans font-medium">
                   {metric.description}
                 </p>
               </div>

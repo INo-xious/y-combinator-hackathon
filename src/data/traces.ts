@@ -693,10 +693,10 @@ export const MOCK_TRACES: Trace[] = [
           cost: 0.038,
           tokens: { prompt: 1400, completion: 220, total: 1620 },
           hash: '9e8d7c6b5a4a3b2c',
-          prompt: 'Draft a short B2B sales email to Jane Doe, VP Engineering at Acme Corp. Pitch our new product: Agent-RR, the deterministic replay engine for AI agents that saves 80% on API testing costs.',
-          response: 'Subject: Record once. Replay forever - Agent-RR for Acme Corp\n\nHi Jane,\n\nI saw you are heading engineering at Acme Corp. AI teams struggle with expensive and flaky agent testing due to constant LLM API invocations.\n\nAgent-RR records your agent runs and replayed execution paths deterministically without making repeat LLM calls, saving up to 80% in API charges and letting you debug step-by-step.\n\nWould you be open to a 10-minute demo next Tuesday?\n\nBest,\nSales Agent',
+          prompt: 'Draft a short B2B sales email to Jane Doe, VP Engineering at Acme Corp. Pitch our new product: Agent-M², the deterministic replay engine for AI agents that saves 80% on API testing costs.',
+          response: 'Subject: Record once. Replay forever - Agent-M² for Acme Corp\n\nHi Jane,\n\nI saw you are heading engineering at Acme Corp. AI teams struggle with expensive and flaky agent testing due to constant LLM API invocations.\n\nAgent-M² records your agent runs and replayed execution paths deterministically without making repeat LLM calls, saving up to 80% in API charges and letting you debug step-by-step.\n\nWould you be open to a 10-minute demo next Tuesday?\n\nBest,\nSales Agent',
           inputJson: JSON.stringify({ model: 'gpt-4o', temperature: 0.7 }, null, 2),
-          outputJson: JSON.stringify({ subject: 'Record once. Replay forever - Agent-RR for Acme Corp', charCount: 450 }, null, 2)
+          outputJson: JSON.stringify({ subject: 'Record once. Replay forever - Agent-M² for Acme Corp', charCount: 450 }, null, 2)
         }
       },
       {
@@ -710,7 +710,7 @@ export const MOCK_TRACES: Trace[] = [
           latency: '1.1s',
           cost: 0.002,
           hash: 'e5d4a3b2c1f6e5d4',
-          inputJson: JSON.stringify({ to: 'jane.doe@acme.com', subject: 'Record once. Replay forever - Agent-RR for Acme Corp' }, null, 2),
+          inputJson: JSON.stringify({ to: 'jane.doe@acme.com', subject: 'Record once. Replay forever - Agent-M² for Acme Corp' }, null, 2),
           outputJson: JSON.stringify({ emailSent: true, messageId: 'sg_8731dha829' }, null, 2)
         }
       },

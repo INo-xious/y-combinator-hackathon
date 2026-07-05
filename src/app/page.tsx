@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
@@ -35,8 +35,8 @@ export default function Page() {
     nodeId: string;
     expectedHash: string;
     actualHash: string;
-    expectedPayload: any;
-    actualPayload: any;
+    expectedPayload: unknown;
+    actualPayload: unknown;
   } | null>(null);
 
   // Fetch list of traces on mount
@@ -55,7 +55,9 @@ export default function Page() {
   };
 
   useEffect(() => {
-    fetchTracesList();
+    setTimeout(() => {
+      fetchTracesList();
+    }, 0);
   }, []);
 
   // Fetch trace details when active trace selection changes
@@ -96,51 +98,13 @@ export default function Page() {
   };
 
   useEffect(() => {
-    fetchTraceDetails(selectedTraceId);
+    setTimeout(() => {
+      fetchTraceDetails(selectedTraceId);
+    }, 0);
   }, [selectedTraceId]);
 
-  // Hook to watch timelineIndex during playback to detect divergence step
-  useEffect(() => {
-    if (isReplaying && divergenceReport && timelineIndex === divergenceReport.sequenceIndex) {
-      // Divergence step reached! Stop playback and flash red
-      setIsReplaying(false);
-      // Automatically navigate to split screen view to compare runs
-      setTimeout(() => {
-        setActiveView('compare');
-      }, 1200);
-    }
-  }, [timelineIndex, isReplaying, divergenceReport]);
-
-  // Global keyboard shortcuts
-  useEffect(() => {
-    const handleGlobalShortcuts = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && activeView === 'replay' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT' && document.activeElement?.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        triggerReplayPlayback();
-      }
-      if (activeView === 'replay' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {
-        if (e.key === 'ArrowRight') {
-          e.preventDefault();
-          setIsReplaying(false);
-          setTimelineIndex(prev => Math.min(activeTrace.nodes.length - 1, prev + 1));
-        }
-        if (e.key === 'ArrowLeft') {
-          e.preventDefault();
-          setIsReplaying(false);
-          setTimelineIndex(prev => Math.max(0, prev - 1));
-        }
-      }
-    };
-    window.addEventListener('keydown', handleGlobalShortcuts);
-    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
-  }, [activeView, isReplaying, activeTrace.nodes.length, divergenceReport]);
-
-  const handleSelectTrace = (traceId: string) => {
-    setSelectedTraceId(traceId);
-  };
-
   // POST Request to trigger Python replayer validate commands
-  const triggerReplayPlayback = async () => {
+  const triggerReplayPlayback = useCallback(async () => {
     if (isReplaying) {
       setIsReplaying(false);
       return;
@@ -173,6 +137,46 @@ export default function Page() {
 
     // Start playback animation
     setIsReplaying(true);
+  }, [isReplaying, selectedTraceId]);
+
+  // Hook to watch timelineIndex during playback to detect divergence step
+  useEffect(() => {
+    if (isReplaying && divergenceReport && timelineIndex === divergenceReport.sequenceIndex) {
+      // Divergence step reached! Stop playback and flash red
+      // Automatically navigate to split screen view to compare runs
+      setTimeout(() => {
+        setIsReplaying(false);
+        setActiveView('compare');
+      }, 1200);
+    }
+  }, [timelineIndex, isReplaying, divergenceReport]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && activeView === 'replay' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        triggerReplayPlayback();
+      }
+      if (activeView === 'replay' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'SELECT') {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          setIsReplaying(false);
+          setTimelineIndex(prev => Math.min(activeTrace.nodes.length - 1, prev + 1));
+        }
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          setIsReplaying(false);
+          setTimelineIndex(prev => Math.max(0, prev - 1));
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, [activeView, isReplaying, activeTrace.nodes.length, divergenceReport, triggerReplayPlayback]);
+
+  const handleSelectTrace = (traceId: string) => {
+    setSelectedTraceId(traceId);
   };
 
   // POST Request to trigger Python live recorder run scripts
@@ -288,10 +292,12 @@ export default function Page() {
     }
   };
 
+  const isLanding = activeView === 'landing';
+
   return (
-    <div className="flex h-screen overflow-hidden bg-brand-bg text-brand-text">
+    <div className={`flex bg-brand-bg text-brand-text ${isLanding ? 'min-h-screen' : 'h-screen overflow-hidden'}`}>
       {/* Sidebar Panel Navigation */}
-      {activeView !== 'landing' && (
+      {!isLanding && (
         <Sidebar 
           activeView={activeView}
           onNavigate={setActiveView}
@@ -300,9 +306,9 @@ export default function Page() {
       )}
 
       {/* Primary Workspace Window */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`flex-1 flex flex-col ${isLanding ? '' : 'overflow-hidden'}`}>
         {/* Top Navbar */}
-        {activeView !== 'landing' && (
+        {!isLanding && (
           <Navbar 
             activeView={activeView}
             activeTrace={activeTrace}
@@ -312,7 +318,7 @@ export default function Page() {
         )}
 
         {/* View Frame */}
-        <main className="flex-1 overflow-hidden bg-brand-bg relative">
+        <main className={`flex-1 bg-brand-bg relative ${isLanding ? '' : 'overflow-hidden'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeView + (isLoading ? '-loading' : '-ready')}
@@ -320,7 +326,7 @@ export default function Page() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.15 }}
-              className="h-full w-full flex flex-col overflow-y-auto"
+              className={isLanding ? "w-full" : "h-full w-full flex flex-col overflow-y-auto"}
             >
               {renderActiveView()}
             </motion.div>

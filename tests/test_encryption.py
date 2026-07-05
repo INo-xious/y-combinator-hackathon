@@ -147,7 +147,7 @@ def test_none_fields_stay_none():
 
 
 def test_load_fernet_cipher_without_key_is_none(monkeypatch):
-    monkeypatch.delenv("AGENT_RR_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("AGENT_M2_ENCRYPTION_KEY", raising=False)
     assert load_fernet_cipher() is None
 
 

@@ -13,8 +13,8 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Agent-RR | Deterministic Replay Engine & Debugger",
-  description: "Deterministic Replay Engine and Time-Travel Debugger for AI Agents. Record once. Replay forever. Debug with surgical precision.",
+  title: "M² | Deterministic Replay Engine & Debugger",
+  description: "M² is a deterministic replay engine and time-travel debugger for AI agents. Record once. Replay forever. Debug with surgical precision.",
 };
 
 export default function RootLayout({

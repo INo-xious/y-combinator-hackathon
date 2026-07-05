@@ -8,19 +8,6 @@ import {
 } from 'lucide-react';
 import SectionHeader from '@/components/shared/SectionHeader';
 
-/**
- * DemoSection — Interactive Time-Travel Debugger Sandbox.
- * 
- * CRITICAL: This component preserves ALL existing interactive debugger logic
- * from the original LandingView.tsx, including:
- * - DEMO_STEPS data
- * - Playback timer
- * - Scrubber controls (play/pause/reset/slider)
- * - Divergence simulation toggle
- * - JSON inspector panel
- * - Accumulated metrics display
- */
-
 interface DemoStep {
   id: string;
   label: string;
@@ -124,17 +111,11 @@ const DEMO_STEPS: DemoStep[] = [
 ];
 
 export default function DemoSection() {
-  // Scrubber simulator state — identical to original
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [simulateDivergence, setSimulateDivergence] = useState<boolean>(false);
 
-  // Accumulated metrics
-  const [accumulatedLatency, setAccumulatedLatency] = useState<number>(0);
-  const [accumulatedCost, setAccumulatedCost] = useState<number>(0);
-  const [savedTokensMsg, setSavedTokensMsg] = useState<string>('0% tokens cached');
-
-  // Playback timer loop — identical to original
+  // Playback timer loop
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (isPlaying) {
@@ -151,24 +132,20 @@ export default function DemoSection() {
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  // Dynamic values calculation — identical to original
-  useEffect(() => {
-    let lat = 0;
-    let cost = 0;
-    for (let i = 0; i <= currentStep; i++) {
-      const step = DEMO_STEPS[i];
-      lat += parseFloat(step.latency);
-      cost += parseFloat(step.cost.replace('$', ''));
-    }
-    setAccumulatedLatency(parseFloat(lat.toFixed(1)));
-    setAccumulatedCost(parseFloat(cost.toFixed(3)));
+  // Derived metrics values (calculated directly during render to prevent useEffect state update cascades)
+  let accumulatedLatency = 0;
+  let accumulatedCost = 0;
+  for (let i = 0; i <= currentStep; i++) {
+    const step = DEMO_STEPS[i];
+    accumulatedLatency += parseFloat(step.latency);
+    accumulatedCost += parseFloat(step.cost.replace('$', ''));
+  }
+  accumulatedLatency = parseFloat(accumulatedLatency.toFixed(1));
+  accumulatedCost = parseFloat(accumulatedCost.toFixed(3));
 
-    if (currentStep > 0) {
-      setSavedTokensMsg(`Local cache bypassed ${currentStep} LLM/tool calls — saving $${cost.toFixed(3)} API costs`);
-    } else {
-      setSavedTokensMsg('Drag slider or hit Play to scrub execution');
-    }
-  }, [currentStep]);
+  const savedTokensMsg = currentStep > 0
+    ? `Local cache bypassed ${currentStep} LLM/tool calls — saving $${accumulatedCost.toFixed(3)} API costs`
+    : 'Drag slider or hit Play to scrub execution';
 
   const handleReset = () => {
     setCurrentStep(0);
@@ -190,14 +167,14 @@ export default function DemoSection() {
   };
 
   return (
-    <section className="relative py-32 overflow-hidden">
+    <section className="relative py-36 overflow-hidden">
       {/* Top divider */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
       
       {/* Background ambient */}
-      <div className="absolute top-1/3 left-1/4 w-[600px] h-[600px] rounded-full bg-emerald-500/[0.02] blur-[150px] pointer-events-none" />
+      <div className="absolute top-1/3 left-1/4 w-[600px] h-[600px] rounded-full bg-emerald-500/[0.015] blur-[150px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-6 relative z-10">
         <SectionHeader
           badge="Interactive playground"
           badgeIcon={<Activity className="w-3.5 h-3.5 animate-pulse" />}
@@ -212,22 +189,22 @@ export default function DemoSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-50px' }}
           transition={{ duration: 0.8, ease: [0.21, 0.45, 0.27, 0.9] }}
-          className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch"
+          className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch mt-12"
         >
           {/* Left Side Controls & Node Checklist */}
-          <div className="lg:col-span-5 rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-6 flex flex-col justify-between">
+          <div className="lg:col-span-5 rounded-3xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-md p-6 flex flex-col justify-between shadow-2xl">
             <div>
               <div className="flex items-center justify-between border-b border-white/[0.06] pb-4 mb-6">
                 <div>
                   <h3 className="text-sm font-semibold text-white">Causal Nodes Checklist</h3>
-                  <p className="text-[11px] text-white/30 mt-0.5">Execution flow for Customer Support Agent</p>
+                  <p className="text-[11px] text-white/30 mt-0.5 font-medium">Execution flow for Customer Support Agent</p>
                 </div>
                 <span className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 font-mono text-[10px] font-semibold">
                   Step {currentStep + 1} of {DEMO_STEPS.length}
                 </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {DEMO_STEPS.map((step, idx) => {
                   const isActive = currentStep === idx;
                   const isCompleted = idx < currentStep;
@@ -240,27 +217,27 @@ export default function DemoSection() {
                         setCurrentStep(idx);
                         setIsPlaying(false);
                       }}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all duration-200 text-xs font-medium cursor-pointer ${
+                      className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all duration-300 text-xs font-semibold cursor-pointer ${
                         isActive
                           ? isDiverged
-                            ? 'border-red-500/40 bg-red-500/[0.08] text-white shadow-lg shadow-red-500/5'
-                            : 'border-blue-500/40 bg-blue-500/[0.08] text-white shadow-lg shadow-blue-500/5'
+                            ? 'border-red-500/50 bg-red-500/[0.08] text-white shadow-xl shadow-red-500/10 scale-[1.01]'
+                            : 'border-blue-500/50 bg-blue-500/[0.08] text-white shadow-xl shadow-blue-500/10 scale-[1.01]'
                           : isDiverged
-                            ? 'border-red-500/20 bg-red-500/[0.03] text-white/50 hover:text-white'
-                            : 'border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.02] text-white/50 hover:text-white'
+                            ? 'border-red-500/20 bg-red-500/[0.02] text-white/40 hover:text-white'
+                            : 'border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.02] text-white/45 hover:text-white'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center border transition ${
+                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center border transition-all duration-300 ${
                           isActive
                             ? isDiverged
-                              ? 'bg-red-500/20 border-red-500/40'
-                              : 'bg-blue-500/20 border-blue-500/40'
+                              ? 'bg-red-500/25 border-red-500/50'
+                              : 'bg-blue-500/25 border-blue-500/50'
                             : isDiverged
                               ? 'bg-red-500/10 border-red-500/20'
                               : isCompleted
                                 ? 'bg-emerald-500/10 border-emerald-500/20'
-                                : 'bg-white/[0.03] border-white/[0.06]'
+                                : 'bg-white/[0.02] border-white/[0.05]'
                         }`}>
                           {isCompleted && !isDiverged ? (
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -269,10 +246,10 @@ export default function DemoSection() {
                           )}
                         </div>
                         <div className="flex flex-col">
-                          <span className={`font-semibold ${isActive ? 'text-white' : ''}`}>
+                          <span className={`font-bold tracking-tight ${isActive ? 'text-white' : ''}`}>
                             {step.label}
                           </span>
-                          <span className="text-[10px] text-white/30 font-mono mt-0.5">
+                          <span className="text-[10px] text-white/30 font-mono mt-0.5 font-medium">
                             {step.toolName ? step.toolName : step.type.toUpperCase()}
                           </span>
                         </div>
@@ -285,7 +262,7 @@ export default function DemoSection() {
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
                           </span>
                         )}
-                        <span className="text-[10px] text-white/30 font-mono bg-white/[0.03] px-1.5 py-0.5 rounded border border-white/[0.04]">
+                        <span className="text-[10px] text-white/30 font-mono bg-white/[0.03] px-2 py-0.5 rounded border border-white/[0.05]">
                           {step.latency}
                         </span>
                       </div>
@@ -296,14 +273,14 @@ export default function DemoSection() {
             </div>
 
             {/* Controls */}
-            <div className="mt-8 pt-4 border-t border-white/[0.06] space-y-4">
+            <div className="mt-8 pt-6 border-t border-white/[0.06] space-y-4">
               {/* Divergence Toggle */}
-              <div className="p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
+              <div className="p-3.5 bg-white/[0.015] border border-white/[0.04] rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
                   <AlertTriangle className={`w-4 h-4 ${simulateDivergence ? 'text-red-400 animate-pulse' : 'text-white/30'}`} />
-                  <div className="flex flex-col">
-                    <span className="text-xs font-semibold text-white">Simulate Divergence</span>
-                    <span className="text-[9px] text-white/30">Mock a prompt drift in Step 5</span>
+                  <div className="flex flex-col text-left">
+                    <span className="text-xs font-bold text-white">Simulate Divergence</span>
+                    <span className="text-[9px] text-white/35 font-medium mt-0.5">Inject prompt regression at Step 5</span>
                   </div>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -313,29 +290,29 @@ export default function DemoSection() {
                     onChange={(e) => setSimulateDivergence(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-9 h-5 bg-white/[0.06] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white/30 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-500/30 peer-checked:after:bg-red-400" />
+                  <div className="w-9 h-5 bg-white/[0.06] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white/35 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-500/30 peer-checked:after:bg-red-400" />
                 </label>
               </div>
 
               {/* Playback controls */}
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-200 ${
+                    className={`w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer transition-all duration-300 ${
                       isPlaying
                         ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                        : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20'
+                        : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/35'
                     }`}
                   >
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
                   </button>
                   <button
                     onClick={handleReset}
-                    className="w-9 h-9 rounded-xl border border-white/[0.06] bg-white/[0.02] text-white/40 hover:text-white transition flex items-center justify-center cursor-pointer"
+                    className="w-10 h-10 rounded-2xl border border-white/[0.06] bg-white/[0.02] text-white/40 hover:text-white hover:bg-white/[0.04] transition flex items-center justify-center cursor-pointer"
                     title="Reset Scrubber"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-4 h-4" />
                   </button>
                 </div>
 
@@ -357,28 +334,28 @@ export default function DemoSection() {
           </div>
 
           {/* Right Side Inspect Payload Panel */}
-          <div className="lg:col-span-7 rounded-2xl border border-white/[0.06] bg-[#08090f] flex flex-col justify-between overflow-hidden shadow-2xl relative">
+          <div className="lg:col-span-7 rounded-3xl border border-white/[0.06] bg-[#07080d]/90 backdrop-blur-xl flex flex-col justify-between overflow-hidden shadow-2xl relative">
             {/* Header */}
-            <div className="bg-black/40 px-5 py-4 border-b border-white/[0.04] flex items-center justify-between">
+            <div className="bg-black/25 px-6 py-4 border-b border-white/[0.04] flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-white/[0.06]" />
                   <div className="w-2.5 h-2.5 rounded-full bg-white/[0.06]" />
                   <div className="w-2.5 h-2.5 rounded-full bg-white/[0.06]" />
                 </div>
-                <span className="text-xs font-semibold font-mono text-white/60">
+                <span className="text-xs font-bold font-mono text-white/50">
                   node_inspector_payload.json
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
                 {isDivergedAtStep(currentStep) ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-red-500/10 border border-red-500/20 text-red-400 uppercase font-mono tracking-wider">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-red-500/10 border border-red-500/20 text-red-400 uppercase font-mono tracking-wider">
                     <AlertTriangle className="w-3 h-3" />
                     <span>Diverged</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 uppercase font-mono tracking-wider">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 uppercase font-mono tracking-wider">
                     <ShieldCheck className="w-3 h-3" />
                     <span>Identical</span>
                   </span>
@@ -387,23 +364,23 @@ export default function DemoSection() {
             </div>
 
             {/* JSON Inspector */}
-            <div className="p-5 flex-1 font-mono text-xs overflow-y-auto space-y-4 select-text">
+            <div className="p-6 flex-1 font-mono text-xs overflow-y-auto space-y-5 select-text">
               {/* Step Metadata */}
-              <div>
-                <span className="text-[10px] text-white/30 uppercase font-semibold tracking-wider font-sans block mb-2">Step Metadata</span>
-                <div className="grid grid-cols-3 gap-3 p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl text-left">
+              <div className="text-left">
+                <span className="text-[10px] text-white/30 uppercase font-bold tracking-wider font-sans block mb-2">Step Metadata</span>
+                <div className="grid grid-cols-3 gap-4 p-4 bg-white/[0.015] border border-white/[0.04] rounded-2xl">
                   <div>
-                    <span className="text-[9px] text-white/30 block">Latency</span>
-                    <span className="text-xs font-bold text-white font-mono">{DEMO_STEPS[currentStep].latency}</span>
+                    <span className="text-[9px] text-white/30 block font-medium">Latency</span>
+                    <span className="text-xs font-bold text-white">{DEMO_STEPS[currentStep].latency}</span>
                   </div>
                   <div>
-                    <span className="text-[9px] text-white/30 block">API Cost</span>
-                    <span className="text-xs font-bold text-amber-400 font-mono">{DEMO_STEPS[currentStep].cost}</span>
+                    <span className="text-[9px] text-white/30 block font-medium">API Cost</span>
+                    <span className="text-xs font-bold text-amber-400">{DEMO_STEPS[currentStep].cost}</span>
                   </div>
                   <div>
-                    <span className="text-[9px] text-white/30 block">Integrity Hash</span>
-                    <span className="text-[11px] font-semibold text-purple-400 font-mono">
-                      SHA:{Math.abs(7910283 + currentStep * 12093).toString(16).substring(0, 8)}
+                    <span className="text-[9px] text-white/30 block font-medium">Integrity Hash</span>
+                    <span className="text-[11px] font-bold text-purple-400">
+                      SHA:{Math.abs(7910283 + currentStep * 12093).toString(16).substring(0, 8).toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -411,25 +388,25 @@ export default function DemoSection() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Input JSON */}
-                <div className="space-y-1.5 text-left">
-                  <span className="text-[10px] text-white/30 uppercase font-semibold tracking-wider font-sans">Input parameters</span>
-                  <pre className="p-3 bg-white/[0.02] border border-white/[0.04] rounded-xl text-[11px] text-white/40 max-h-56 overflow-y-auto overflow-x-auto whitespace-pre">
+                <div className="space-y-2 text-left">
+                  <span className="text-[10px] text-white/30 uppercase font-bold tracking-wider font-sans">Input parameters</span>
+                  <pre className="p-3 bg-white/[0.01] border border-white/[0.04] rounded-2xl text-[11px] text-white/40 max-h-56 overflow-y-auto overflow-x-auto whitespace-pre">
                     {DEMO_STEPS[currentStep].inputJson}
                   </pre>
                 </div>
 
                 {/* Output JSON */}
-                <div className="space-y-1.5 text-left">
-                  <span className="text-[10px] text-white/30 uppercase font-semibold tracking-wider font-sans flex items-center justify-between">
+                <div className="space-y-2 text-left">
+                  <span className="text-[10px] text-white/30 uppercase font-bold tracking-wider font-sans flex items-center justify-between">
                     <span>Output payload</span>
                     {isDivergedAtStep(currentStep) && (
-                      <span className="text-[9px] text-red-400 font-semibold animate-pulse uppercase">drift detected</span>
+                      <span className="text-[9px] text-red-400 font-bold animate-pulse uppercase">drift detected</span>
                     )}
                   </span>
-                  <pre className={`p-3 border rounded-xl text-[11px] max-h-56 overflow-y-auto overflow-x-auto whitespace-pre transition ${
+                  <pre className={`p-3 border rounded-2xl text-[11px] max-h-56 overflow-y-auto overflow-x-auto whitespace-pre transition duration-300 ${
                     isDivergedAtStep(currentStep)
-                      ? 'bg-red-500/[0.04] border-red-500/20 text-red-400'
-                      : 'bg-white/[0.02] border-white/[0.04] text-emerald-400'
+                      ? 'bg-red-500/[0.03] border-red-500/20 text-red-400'
+                      : 'bg-white/[0.01] border-white/[0.04] text-emerald-400'
                   }`}>
                     {isDivergedAtStep(currentStep) && DEMO_STEPS[currentStep].divergedOutputJson
                       ? DEMO_STEPS[currentStep].divergedOutputJson
@@ -444,41 +421,41 @@ export default function DemoSection() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-3.5 bg-red-500/[0.06] border border-red-500/20 rounded-xl text-left flex items-start gap-2.5"
+                  className="p-4 bg-red-500/[0.04] border border-red-500/20 rounded-2xl text-left flex items-start gap-3"
                 >
                   <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5 animate-pulse" />
                   <div>
                     <h4 className="text-xs font-bold text-white">LLM Divergence Detected on Decisional Node</h4>
-                    <p className="text-[10px] text-white/40 mt-1 leading-relaxed">
-                      Expected approval hash diverges from live baseline runtime. Output values shifted action from <b className="text-white/60">&quot;APPROVE_REFUND&quot;</b> to <b className="text-white/60">&quot;REJECT_REFUND&quot;</b> due to strict local validation checks on photos. Replayer stopped code execution.
+                    <p className="text-[10.5px] text-white/40 mt-1 leading-relaxed">
+                      Expected approval hash diverges from live baseline runtime. Output values shifted action from <b className="text-white/60">&quot;APPROVE_REFUND&quot;</b> to <b className="text-white/60">&quot;REJECT_REFUND&quot;</b> due to strict photo verification rules. Replayer stopped code execution.
                     </p>
                   </div>
                 </motion.div>
               )}
 
               {/* Causal description */}
-              <div className="p-3 bg-white/[0.015] border border-white/[0.04] rounded-xl text-left">
-                <span className="text-[10px] text-white/30 uppercase font-semibold tracking-wider font-sans block mb-1.5">Causal Description</span>
-                <p className="text-xs text-white/50 leading-relaxed">
+              <div className="p-4 bg-white/[0.01] border border-white/[0.04] rounded-2xl text-left">
+                <span className="text-[10px] text-white/30 uppercase font-bold tracking-wider font-sans block mb-1.5">Causal Description</span>
+                <p className="text-xs text-white/50 leading-relaxed font-sans">
                   {DEMO_STEPS[currentStep].description}
                 </p>
               </div>
             </div>
 
             {/* Bottom statistics */}
-            <div className="bg-black/40 px-5 py-3 border-t border-white/[0.04] flex flex-col md:flex-row justify-between items-start md:items-center gap-2.5">
-              <span className="text-[10px] font-mono text-white/30">
+            <div className="bg-black/25 px-6 py-4.5 border-t border-white/[0.04] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+              <span className="text-[10px] font-mono text-white/35 font-medium">
                 {savedTokensMsg}
               </span>
 
               <div className="flex items-center gap-4 text-xs font-mono">
                 <div>
-                  <span className="text-white/30">Latency: </span>
+                  <span className="text-white/30 font-medium">Latency: </span>
                   <span className="text-white font-bold">{accumulatedLatency}s</span>
                 </div>
-                <div className="w-px h-3 bg-white/[0.06]" />
+                <div className="w-px h-3 bg-white/[0.08]" />
                 <div>
-                  <span className="text-white/30">Cost: </span>
+                  <span className="text-white/30 font-medium">Cost: </span>
                   <span className="text-amber-400 font-bold">${accumulatedCost.toFixed(3)}</span>
                 </div>
               </div>

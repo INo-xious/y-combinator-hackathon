@@ -32,7 +32,7 @@ export default function Navbar({
     <header className="h-16 border-b border-brand-border bg-[#090F1B] px-6 flex items-center justify-between sticky top-0 z-40">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm">
-        <span className="text-brand-secondary">agent-rr</span>
+        <span className="text-brand-secondary font-bold font-[family-name:var(--font-display)]">M²</span>
         <ChevronRight className="w-3.5 h-3.5 text-brand-secondary shrink-0" />
         <span className="font-semibold text-white">{getViewName()}</span>
 

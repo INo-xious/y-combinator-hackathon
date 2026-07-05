@@ -1,4 +1,4 @@
-"""Tests for the agent-rr CLI: record, replay, validate."""
+"""Tests for the agent-m2 CLI: record, replay, validate."""
 
 from __future__ import annotations
 
@@ -187,7 +187,7 @@ def test_no_args_returns_argparse_usage_code(capsys):
     captured = capsys.readouterr()
     assert rc == 2
     assert captured.out == ""
-    assert "usage: agent-rr" in captured.err
+    assert "usage: agent-m2" in captured.err
 
 
 def test_view_writes_self_contained_html(tmp_path, capsys):

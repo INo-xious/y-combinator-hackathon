@@ -164,7 +164,7 @@ export default function CommandPalette({
 
           {actions.length === 0 && filteredTraces.length === 0 && (
             <div className="py-6 text-center text-sm text-brand-secondary">
-              No commands or traces found for "{query}"
+              No commands or traces found for &quot;{query}&quot;
             </div>
           )}
         </div>

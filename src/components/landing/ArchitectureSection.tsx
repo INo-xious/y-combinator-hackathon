@@ -5,19 +5,13 @@ import { motion } from 'framer-motion';
 import { Terminal, Layers, Play, ArrowRight, Code2 } from 'lucide-react';
 import SectionHeader from '@/components/shared/SectionHeader';
 
-/**
- * ArchitectureSection — Shows the 3-step developer workflow
- * with animated sequential reveal and code snippets.
- * Preserves existing "How It Works" content.
- */
-
 const steps = [
   {
     number: '01',
     icon: <Terminal className="w-5 h-5" />,
     title: 'Instrument your Agent',
     description: 'Add simple decorators to your LLM call loops and external tool integrations. Specify which fields are inputs, outputs, or state dependencies to build the dependency tree.',
-    code: `from agent_rr import record_run
+    code: `from m2_replayer import record_run
 
 @record_run(name="classification")
 def intent_classifier(query):
@@ -31,7 +25,7 @@ def intent_classifier(query):
     number: '02',
     icon: <Layers className="w-5 h-5" />,
     title: 'Record Traces to DAGs',
-    description: 'As your agent runs in production or testing, Agent-RR monitors the execution graph, generating cryptographic SHA-256 validation IDs for every node. Redacts sensitive credentials locally.',
+    description: 'As your agent runs in production or testing, M² monitors the execution graph, generating cryptographic SHA-256 validation IDs for every node. Redacts sensitive credentials locally.',
     code: `# Traces compiled as JSON DAGs
 {
   "traceId": "customer-support",
@@ -61,14 +55,14 @@ interface ArchitectureSectionProps {
 
 export default function ArchitectureSection({ onNavigate }: ArchitectureSectionProps) {
   return (
-    <section className="relative py-32 overflow-hidden">
+    <section className="relative py-36 overflow-hidden">
       {/* Top divider */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
       
       {/* Ambient glow */}
-      <div className="absolute top-1/2 right-0 w-[500px] h-[500px] rounded-full bg-purple-500/[0.02] blur-[150px] pointer-events-none" />
+      <div className="absolute top-1/2 right-0 w-[500px] h-[500px] rounded-full bg-purple-500/[0.01] blur-[150px] pointer-events-none" />
 
-      <div className="max-w-6xl mx-auto px-6">
+      <div className="max-w-6xl mx-auto px-6 relative z-10">
         <SectionHeader
           badge="How it works"
           badgeIcon={<Code2 className="w-3.5 h-3.5" />}
@@ -77,7 +71,7 @@ export default function ArchitectureSection({ onNavigate }: ArchitectureSectionP
           subtitle="A developer-first workflow to record agent executions and replay them cleanly under controlled conditions."
         />
 
-        <div className="space-y-6">
+        <div className="space-y-8 mt-12">
           {steps.map((step, index) => (
             <motion.div
               key={index}
@@ -89,26 +83,26 @@ export default function ArchitectureSection({ onNavigate }: ArchitectureSectionP
                 delay: index * 0.15,
                 ease: [0.21, 0.45, 0.27, 0.9],
               }}
-              className={`relative rounded-2xl border ${step.borderColor} bg-white/[0.02] backdrop-blur-sm overflow-hidden group hover:bg-white/[0.03] transition-all duration-500`}
+              className={`relative rounded-3xl border ${step.borderColor} bg-white/[0.015] backdrop-blur-md overflow-hidden group hover:bg-white/[0.03] transition-all duration-500 shadow-xl`}
             >
               <div className="flex flex-col lg:flex-row">
                 {/* Left content */}
-                <div className="flex-1 p-8 lg:p-10">
-                  <div className="flex items-center gap-4 mb-5">
+                <div className="flex-1 p-8 lg:p-12 text-left">
+                  <div className="flex items-center gap-4 mb-6">
                     {/* Step number */}
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${step.gradient} flex items-center justify-center text-white shadow-lg`}>
+                    <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${step.gradient} flex items-center justify-center text-white shadow-lg`}>
                       {step.icon}
                     </div>
                     
                     <div>
-                      <span className="text-xs font-mono text-white/30 uppercase tracking-widest">Step {step.number}</span>
-                      <h3 className="text-xl font-semibold text-white font-[family-name:var(--font-display)]">
+                      <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest font-bold">Step {step.number}</span>
+                      <h3 className="text-xl font-bold text-white font-[family-name:var(--font-display)] mt-0.5">
                         {step.title}
                       </h3>
                     </div>
                   </div>
 
-                  <p className="text-sm text-white/40 leading-relaxed max-w-lg">
+                  <p className="text-sm text-white/40 leading-relaxed max-w-lg font-sans">
                     {step.description}
                   </p>
 
@@ -116,7 +110,7 @@ export default function ArchitectureSection({ onNavigate }: ArchitectureSectionP
                   {index === steps.length - 1 && (
                     <button
                       onClick={() => onNavigate('dashboard')}
-                      className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-sm font-semibold hover:opacity-90 transition cursor-pointer shadow-lg shadow-emerald-500/20"
+                      className="mt-8 inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-bold hover:opacity-90 hover:shadow-emerald-500/25 shadow-lg shadow-emerald-500/10 transition cursor-pointer"
                     >
                       <span>Launch Replayer</span>
                       <ArrowRight className="w-4 h-4" />
@@ -126,18 +120,18 @@ export default function ArchitectureSection({ onNavigate }: ArchitectureSectionP
 
                 {/* Right code block */}
                 {step.code && (
-                  <div className="lg:w-[400px] border-t lg:border-t-0 lg:border-l border-white/[0.04] bg-black/20">
-                    <div className="px-4 py-2.5 border-b border-white/[0.04] flex items-center gap-2">
+                  <div className="lg:w-[420px] border-t lg:border-t-0 lg:border-l border-white/[0.04] bg-black/30">
+                    <div className="px-5 py-3 border-b border-white/[0.04] flex items-center gap-2">
                       <div className="flex gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-white/[0.06]" />
-                        <div className="w-2.5 h-2.5 rounded-full bg-white/[0.06]" />
-                        <div className="w-2.5 h-2.5 rounded-full bg-white/[0.06]" />
+                        <div className="w-2 h-2 rounded-full bg-white/[0.06]" />
+                        <div className="w-2 h-2 rounded-full bg-white/[0.06]" />
+                        <div className="w-2 h-2 rounded-full bg-white/[0.06]" />
                       </div>
-                      <span className="text-[10px] font-mono text-white/20 ml-2">
+                      <span className="text-[10px] font-mono text-white/30 ml-2 font-bold">
                         {index === 0 ? 'agent.py' : 'trace.json'}
                       </span>
                     </div>
-                    <pre className="p-5 text-[11px] font-mono text-white/50 leading-relaxed overflow-x-auto">
+                    <pre className="p-6 text-[11px] font-mono text-white/45 leading-relaxed overflow-x-auto text-left">
                       {step.code}
                     </pre>
                   </div>

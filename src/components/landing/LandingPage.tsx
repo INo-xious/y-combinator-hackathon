@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, Suspense } from 'react';
 import LandingNavbar from './LandingNavbar';
 import HeroSection from './HeroSection';
 import ProblemSection from './ProblemSection';
@@ -11,79 +11,135 @@ import ArchitectureSection from './ArchitectureSection';
 import PerformanceSection from './PerformanceSection';
 import CTASection from './CTASection';
 import FooterSection from './FooterSection';
-
-/**
- * LandingPage — Main orchestrator for the premium landing experience.
- * Manages section refs for anchor navigation.
- * 
- * NOTE: Lenis smooth scroll removed — page.tsx wraps content in
- * h-screen overflow-hidden, so scrolling is handled by the inner
- * overflow-y-auto container. Lenis targets window scroll which is
- * locked by that parent layout.
- * 
- * Props interface matches original LandingView for seamless integration.
- */
+import NeuralScene from './NeuralScene';
+import { useMousePosition } from '@/hooks/useMousePosition';
 
 interface LandingPageProps {
   onNavigate: (view: string) => void;
 }
 
 export default function LandingPage({ onNavigate }: LandingPageProps) {
+  const mouse = useMousePosition();
+  const scrollProgress = useRef(0);
+  const scrollVelocity = useRef(0);
 
-  // Section refs for anchor navigation
-  const sectionRefs = {
-    features: useRef<HTMLDivElement>(null),
-    demo: useRef<HTMLDivElement>(null),
-    architecture: useRef<HTMLDivElement>(null),
-    performance: useRef<HTMLDivElement>(null),
-  };
+  const featuresRef = useRef<HTMLDivElement>(null);
+  const demoRef = useRef<HTMLDivElement>(null);
+  const architectureRef = useRef<HTMLDivElement>(null);
+  const performanceRef = useRef<HTMLDivElement>(null);
 
   const scrollToSection = (section: string) => {
-    const ref = sectionRefs[section as keyof typeof sectionRefs];
-    if (ref?.current) {
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    let targetRef: React.RefObject<HTMLDivElement | null> | null = null;
+    if (section === 'features') targetRef = featuresRef;
+    if (section === 'demo') targetRef = demoRef;
+    if (section === 'architecture') targetRef = architectureRef;
+    if (section === 'performance') targetRef = performanceRef;
+
+    if (targetRef?.current) {
+      targetRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
+  // Setup Lenis Smooth Scrolling & track window scroll progress
+  useEffect(() => {
+    // Dynamically import Lenis to prevent SSR issue
+    import('lenis').then(({ default: Lenis }) => {
+      const lenis = new Lenis({
+        duration: 1.2,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Apple/Linear smooth exponential transition
+        smoothWheel: true,
+      });
+
+      function raf(time: number) {
+        lenis.raf(time);
+        requestAnimationFrame(raf);
+      }
+      requestAnimationFrame(raf);
+
+      return () => {
+        lenis.destroy();
+      };
+    });
+
+    let lastScrollY = window.scrollY;
+    let lastTime = Date.now();
+
+    const handleScroll = () => {
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      const currentScrollY = window.scrollY;
+      
+      if (scrollHeight > 0) {
+        scrollProgress.current = currentScrollY / scrollHeight;
+      }
+      
+      const now = Date.now();
+      const dt = Math.max(1, now - lastTime);
+      const dy = currentScrollY - lastScrollY;
+      
+      // Calculate velocity (pixels per ms) and smooth it
+      scrollVelocity.current = scrollVelocity.current * 0.85 + Math.abs(dy / dt) * 0.15;
+      
+      lastScrollY = currentScrollY;
+      lastTime = now;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // initial call
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#030306] text-white overflow-x-hidden selection:bg-blue-500/20">
-      {/* Fixed Navigation */}
-      <LandingNavbar onNavigate={onNavigate} onScrollTo={scrollToSection} />
+    <div className="min-h-screen bg-[#030306] text-white overflow-x-hidden selection:bg-blue-500/20 relative">
+      {/* Immersive 3D Backdrop Scene */}
+      <Suspense fallback={null}>
+        <NeuralScene 
+          mouseX={mouse.x} 
+          mouseY={mouse.y} 
+          scrollProgress={scrollProgress}
+          scrollVelocity={scrollVelocity}
+        />
+      </Suspense>
 
-      {/* Hero — Full viewport with 3D scene */}
-      <HeroSection onNavigate={onNavigate} onScrollToTour={() => scrollToSection('demo')} />
+      {/* Foreground Content */}
+      <div className="relative z-10">
+        {/* Fixed Navigation */}
+        <LandingNavbar onNavigate={onNavigate} onScrollTo={scrollToSection} />
 
-      {/* Problem — Pain points */}
-      <ProblemSection />
+        {/* Hero — Full viewport */}
+        <HeroSection onNavigate={onNavigate} onScrollToTour={() => scrollToSection('demo')} />
 
-      {/* Solution — How it works conceptually */}
-      <SolutionSection />
+        {/* Problem — Pain points */}
+        <ProblemSection />
 
-      {/* Features — Interactive cards */}
-      <div ref={sectionRefs.features}>
-        <FeaturesSection />
+        {/* Solution — How it works conceptually */}
+        <SolutionSection />
+
+        {/* Features — Interactive cards */}
+        <div ref={featuresRef}>
+          <FeaturesSection />
+        </div>
+
+        {/* Demo — Interactive time-travel debugger (PRESERVED) */}
+        <div ref={demoRef}>
+          <DemoSection />
+        </div>
+
+        {/* Architecture — Developer workflow */}
+        <div ref={architectureRef}>
+          <ArchitectureSection onNavigate={onNavigate} />
+        </div>
+
+        {/* Performance — Animated metrics */}
+        <div ref={performanceRef}>
+          <PerformanceSection />
+        </div>
+
+        {/* Final CTA */}
+        <CTASection onNavigate={onNavigate} />
+
+        {/* Footer */}
+        <FooterSection />
       </div>
-
-      {/* Demo — Interactive time-travel debugger (PRESERVED) */}
-      <div ref={sectionRefs.demo}>
-        <DemoSection />
-      </div>
-
-      {/* Architecture — Developer workflow */}
-      <div ref={sectionRefs.architecture}>
-        <ArchitectureSection onNavigate={onNavigate} />
-      </div>
-
-      {/* Performance — Animated metrics */}
-      <div ref={sectionRefs.performance}>
-        <PerformanceSection />
-      </div>
-
-      {/* Final CTA */}
-      <CTASection onNavigate={onNavigate} />
-
-      {/* Footer */}
-      <FooterSection />
     </div>
   );
 }

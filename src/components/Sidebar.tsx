@@ -1,6 +1,7 @@
 import React from 'react';
 import { LayoutDashboard, Compass, Play, Split, Settings, Radio, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Logo from '@/components/shared/Logo';
 
 interface SidebarProps {
   activeView: string;
@@ -22,13 +23,11 @@ export default function Sidebar({ activeView, onNavigate, isRecording = false }:
     <aside className="w-64 shrink-0 border-r border-brand-border bg-[#090F1B] flex flex-col justify-between h-screen sticky top-0">
       <div>
         {/* App Title Logo Section */}
-        <div className="h-16 flex items-center px-6 border-b border-brand-border gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-brand-primary flex items-center justify-center shadow-lg shadow-brand-primary/20">
-            <span className="text-white font-extrabold text-sm tracking-tighter">AR</span>
-          </div>
+        <div className="h-16 flex items-center px-6 border-b border-brand-border gap-3">
+          <Logo size="sm" />
           <div>
-            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
-              Agent-RR
+            <h1 className="text-base font-bold tracking-tight text-white flex items-center gap-1.5 font-[family-name:var(--font-display)]">
+              M²
             </h1>
             <p className="text-[10px] text-brand-secondary font-mono tracking-wider">v0.1.0-beta</p>
           </div>

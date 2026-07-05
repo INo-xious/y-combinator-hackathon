@@ -202,7 +202,7 @@ def test_cli_validate_signatures(tmp_path, monkeypatch, capsys):
 
     # --require-signatures without a key is an explicit error.
     assert main(["validate", str(trace), "--require-signatures"]) == 1
-    assert "AGENT_RR_SIGNING_KEY" in capsys.readouterr().out
+    assert "AGENT_M2_SIGNING_KEY" in capsys.readouterr().out
 
     # With the right key: verified.
     monkeypatch.setenv(SIGNING_KEY_ENV_VAR, "cli-key")

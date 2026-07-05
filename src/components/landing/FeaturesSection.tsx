@@ -6,11 +6,6 @@ import { Zap, GitCompare, ShieldCheck, Layers } from 'lucide-react';
 import SectionHeader from '@/components/shared/SectionHeader';
 import GlassCard from '@/components/shared/GlassCard';
 
-/**
- * FeaturesSection — Interactive feature cards with 3D tilt,
- * dynamic lighting, and hover depth. Preserves original feature content.
- */
-
 const features = [
   {
     icon: <Zap className="w-6 h-6" />,
@@ -35,7 +30,7 @@ const features = [
   {
     icon: <ShieldCheck className="w-6 h-6" />,
     title: 'Automated Privacy Guard',
-    description: 'Integrate production logging without leaking secrets. Agent-RR parses all tracing output and redacts API tokens, database passwords, user emails, and phone numbers before writing logs to disk.',
+    description: 'Integrate production logging without leaking secrets. M² parses all tracing output and redacts API tokens, database passwords, user emails, and phone numbers before writing logs to disk.',
     stat: 'PII-safe by default',
     statLabel: 'Automatic redaction engine',
     color: 'text-emerald-400',
@@ -46,11 +41,11 @@ const features = [
 
 export default function FeaturesSection() {
   return (
-    <section className="relative py-32 overflow-hidden">
-      {/* Top divider line */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
+    <section className="relative py-36 overflow-hidden">
+      {/* Divider line */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.04] to-transparent" />
       
-      <div className="max-w-6xl mx-auto px-6">
+      <div className="max-w-6xl mx-auto px-6 relative z-10">
         <SectionHeader
           badge="Core capabilities"
           badgeIcon={<Layers className="w-3.5 h-3.5" />}
@@ -59,7 +54,7 @@ export default function FeaturesSection() {
           subtitle="Resolve flakiness, debug output regression, and log agent states in safe, production-grade sandbox runs."
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
           {features.map((feature, index) => (
             <motion.div
               key={index}
@@ -67,37 +62,37 @@ export default function FeaturesSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-50px' }}
               transition={{
-                duration: 0.6,
+                duration: 0.7,
                 delay: index * 0.12,
                 ease: [0.21, 0.45, 0.27, 0.9],
               }}
             >
               <GlassCard glowColor={feature.glowColor} className="h-full">
-                <div className="p-8 flex flex-col justify-between h-full">
+                <div className="p-8 flex flex-col justify-between h-full min-h-[360px]">
                   <div>
                     {/* Icon with floating animation */}
                     <motion.div
                       animate={{ y: [0, -4, 0] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: index * 0.1 }}
                       className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.gradient} border border-white/[0.06] flex items-center justify-center ${feature.color} mb-6`}
                     >
                       {feature.icon}
                     </motion.div>
 
-                    <h3 className="text-xl font-semibold text-white mb-3">
+                    <h3 className="text-xl font-bold text-white mb-3 font-[family-name:var(--font-display)]">
                       {feature.title}
                     </h3>
-                    <p className="text-sm text-white/40 leading-relaxed">
+                    <p className="text-sm text-white/40 leading-relaxed font-sans">
                       {feature.description}
                     </p>
                   </div>
 
                   {/* Bottom stat bar */}
                   <div className="mt-8 pt-5 border-t border-white/[0.06]">
-                    <div className={`text-sm font-mono font-semibold ${feature.color}`}>
+                    <div className={`text-sm font-mono font-bold ${feature.color}`}>
                       {feature.stat}
                     </div>
-                    <div className="text-xs text-white/30 mt-0.5">
+                    <div className="text-[11px] text-white/35 mt-0.5 font-medium">
                       {feature.statLabel}
                     </div>
                   </div>

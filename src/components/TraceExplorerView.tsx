@@ -27,11 +27,6 @@ export default function TraceExplorerView({
 
   const selectedExplorerTrace = fullTraceDetails || selectedExplorerTraceState || traces[0] || null;
 
-  useEffect(() => {
-    if (!selectedExplorerTraceState && traces.length > 0) {
-      setSelectedExplorerTraceState(traces[0]);
-    }
-  }, [traces, selectedExplorerTraceState]);
 
   useEffect(() => {
     const activeId = selectedExplorerTraceState?.id || traces[0]?.id;

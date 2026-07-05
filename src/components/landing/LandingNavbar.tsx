@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
+import Logo from '@/components/shared/Logo';
 
 /**
  * LandingNavbar — Glassmorphism sticky navigation bar.
@@ -55,11 +56,9 @@ export default function LandingNavbar({ onNavigate, onScrollTo }: LandingNavbarP
         <div className="max-w-7xl mx-auto px-6 h-[4.5rem] flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <span className="text-white font-bold text-xs tracking-tighter">AR</span>
-            </div>
+            <Logo size="sm" />
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold tracking-tight text-white">Agent-RR</span>
+              <span className="text-sm font-bold tracking-tight text-white font-[family-name:var(--font-display)]">M²</span>
               <span className="text-[9px] text-white/25 font-mono border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5 rounded-md">
                 v0.1.0
               </span>

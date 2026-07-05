@@ -137,7 +137,7 @@ export default function CompareRunsView({
                   <span className="text-[9px] uppercase font-bold text-brand-success block mb-1">PROMPT CONFIG</span>
                   <div className="flex items-center gap-2 text-slate-300 font-mono text-[11px]">
                     <span className="text-slate-500">1</span>
-                    <span className="text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/15">"temperature": 0.2</span>
+                    <span className="text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/15">&quot;temperature&quot;: 0.2</span>
                   </div>
                 </div>
                 
@@ -179,7 +179,7 @@ export default function CompareRunsView({
                 <CheckCircle2 className="w-12 h-12 text-brand-success mx-auto opacity-80 animate-pulse" />
                 <h4 className="font-bold text-white text-sm">Baseline Intact</h4>
                 <p className="text-brand-secondary text-xs max-w-xs mx-auto">
-                  Run matches the original baseline signature. Select a diverged trace like "Research Agent" from the dropdown to view code/output differences.
+                  Run matches the original baseline signature. Select a diverged trace like &quot;Research Agent&quot; from the dropdown to view code/output differences.
                 </p>
               </div>
             )}
@@ -203,7 +203,7 @@ export default function CompareRunsView({
                   <span className="text-[9px] uppercase font-bold text-brand-divergence block mb-1">PROMPT CONFIG (MODIFIED)</span>
                   <div className="flex items-center gap-2 text-slate-300 font-mono text-[11px]">
                     <span className="text-slate-500">1</span>
-                    <span className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/15">"temperature": 0.7</span>
+                    <span className="text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/15">&quot;temperature&quot;: 0.7</span>
                   </div>
                 </div>
                 

@@ -63,8 +63,6 @@ export default function NodeInspector({ node, onReplayFromHere }: NodeInspectorP
     }
   };
 
-  const IconNode = getNodeIcon();
-
   return (
     <aside className="w-96 border-l border-brand-border bg-[#090F1B] flex flex-col justify-between shrink-0 h-[calc(100vh-4rem)] overflow-y-auto">
       {/* Node Header Info */}
@@ -72,7 +70,7 @@ export default function NodeInspector({ node, onReplayFromHere }: NodeInspectorP
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-mono uppercase font-bold tracking-wider ${getBadgeStyle()}`}>
-              <IconNode className="w-3 h-3" />
+              {React.createElement(getNodeIcon(), { className: "w-3 h-3" })}
               <span>{data.type}</span>
             </span>
             {data.toolName && (

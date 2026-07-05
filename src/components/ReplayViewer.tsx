@@ -15,10 +15,16 @@ import {
   Play, Pause, SkipBack, SkipForward, Sparkles, Wrench, Database, 
   CheckCircle2, PlayCircle, Zap, ShieldAlert, Copy, RefreshCw, Cpu, Gauge 
 } from 'lucide-react';
-import { Trace, TraceNode } from '@/data/traces';
+import { Trace, TraceNode, TraceNodeData } from '@/data/traces';
+
+interface CustomNodeData extends TraceNodeData {
+  isActive?: boolean;
+  isCompleted?: boolean;
+  isDiverged?: boolean;
+}
 
 // Custom Node Template
-const CustomNode = ({ data }: any) => {
+const CustomNode = ({ data }: { data: CustomNodeData }) => {
   const Icon = useMemo(() => {
     switch (data.type) {
       case 'start': return PlayCircle;

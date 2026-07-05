@@ -1,10 +1,10 @@
-# ✈️ Agent-RR — Deterministic, Git-Friendly Regression Testing for AI Agents
+# ✈️ Agent-M² — Deterministic, Git-Friendly Regression Testing for AI Agents
 
 **Record your agent's run once. Replay it forever — instantly, locally, for free.**
 
-Agent-RR is a causal replay engine for LLM applications and autonomous agents. It intercepts your agent's execution at the boundaries that matter (LLM calls, tool calls), records them as a cryptographically-hashed **causal DAG** in a plain JSONL file, and replays that exact run with zero network calls. Commit the trace next to your code and every future change is regression-tested against recorded reality.
+Agent-M² is a causal replay engine for LLM applications and autonomous agents. It intercepts your agent's execution at the boundaries that matter (LLM calls, tool calls), records them as a cryptographically-hashed **causal DAG** in a plain JSONL file, and replays that exact run with zero network calls. Commit the trace next to your code and every future change is regression-tested against recorded reality.
 
-When your agent's logic drifts, Agent-RR doesn't just fail — it tells you **which call diverged, what changed, and which upstream step caused it**:
+When your agent's logic drifts, Agent-M² doesn't just fail — it tells you **which call diverged, what changed, and which upstream step caused it**:
 
 ```
 ReplayDivergence at tool_call_3: search_flights
@@ -14,9 +14,9 @@ Parent:   llm_call_2: llm_plan
 Likely cause: Your agent changed the arguments it generates after llm_call_2: llm_plan.
 ```
 
-## Why Agent-RR
+## Why Agent-M²
 
-Testing AI agents is notoriously hard: they're non-deterministic, slow, and every test run costs API money. Agent-RR turns one recorded run into a permanent, deterministic test fixture:
+Testing AI agents is notoriously hard: they're non-deterministic, slow, and every test run costs API money. Agent-M² turns one recorded run into a permanent, deterministic test fixture:
 
 - **Zero-cost regression tests.** Replay a complex agent flow thousands of times in CI without ever hitting the OpenAI or Anthropic APIs.
 - **Causal divergence localization.** Every event is hash-pinned to its parents, so a change upstream is reported at the exact node where behavior drifted — with the responsible parent named.
@@ -25,17 +25,17 @@ Testing AI agents is notoriously hard: they're non-deterministic, slow, and ever
 
 ## Why not vcrpy? Why not LangSmith?
 
-**vcrpy records HTTP. Agent-RR records causality.**
+**vcrpy records HTTP. Agent-M² records causality.**
 
 - vcrpy operates at the transport layer: it matches HTTP requests against cassettes by URL/method/body. It has no idea that request #7 exists *because of* the plan the LLM produced in request #2. When your agent changes, you get a cassette miss (`CannotOverwriteExistingCassetteException`) with no explanation of *why* the request changed — or worse, a silently wrong playback.
-- Agent tool calls often aren't HTTP at all — local functions, DB queries, code execution. A transport-level recorder never sees them. Agent-RR records at the *agent boundary* (`record_llm_call` / `record_tool_call`), so every step is captured regardless of transport.
-- Agent-RR's trace is a DAG with `parent_event_ids` and content-addressed hashes: a divergence report names the exact event, the exact payload delta, and the upstream parent whose output fed it.
+- Agent tool calls often aren't HTTP at all — local functions, DB queries, code execution. A transport-level recorder never sees them. Agent-M² records at the *agent boundary* (`record_llm_call` / `record_tool_call`), so every step is captured regardless of transport.
+- Agent-M²'s trace is a DAG with `parent_event_ids` and content-addressed hashes: a divergence report names the exact event, the exact payload delta, and the upstream parent whose output fed it.
 
-**LangSmith is observability. Agent-RR is regression testing.** They're complementary: LangSmith (and friends) show you what your agent did in production, on their servers. Agent-RR answers a different question — *"did my change break the recorded behavior?"* — locally, deterministically, in CI, with traces you own in git. Use both.
+**LangSmith is observability. Agent-M² is regression testing.** They're complementary: LangSmith (and friends) show you what your agent did in production, on their servers. Agent-M² answers a different question — *"did my change break the recorded behavior?"* — locally, deterministically, in CI, with traces you own in git. Use both.
 
 ## 🧠 How it Works (The Causal DAG)
 
-Instead of a flat log, Agent-RR records execution as a Directed Acyclic Graph. Every event carries `parent_event_ids` (which outputs it consumed) and a `context_hash` combining its own payload hash with its parents' hashes. Any change upstream ripples downstream — and is detected at the first affected node.
+Instead of a flat log, Agent-M² records execution as a Directed Acyclic Graph. Every event carries `parent_event_ids` (which outputs it consumed) and a `context_hash` combining its own payload hash with its parents' hashes. Any change upstream ripples downstream — and is detected at the first affected node.
 
 `context_hash` deliberately excludes diagnostic-only fields such as `error.traceback`, so traces remain stable across machines even when Python traceback paths differ. The traceback is still stored on failed boundary events for debugging; only stable error type/message data participates in the hash chain.
 
@@ -143,7 +143,7 @@ divergence.
 ### 2. Visualize the DAG
 
 ```bash
-agent-rr view traces/booking.jsonl
+agent-m2 view traces/booking.jsonl
 ```
 
 Renders the causal DAG to a single self-contained HTML file (no CDN, works offline) and opens it in your browser. Click any node to inspect its payload, response, hashes, and parents. Use `--no-open` in scripts and `--output out.html` to choose the destination.
@@ -154,11 +154,11 @@ All commands print exactly one machine-readable JSON object on stdout — human 
 
 ```bash
 # Verify trace integrity: schema, DAG invariants, cryptographic hashes
-agent-rr validate traces/booking.jsonl
+agent-m2 validate traces/booking.jsonl
 
 # Record / replay the built-in demo agent (a quick end-to-end smoke test)
-agent-rr record demo.jsonl
-agent-rr replay demo.jsonl
+agent-m2 record demo.jsonl
+agent-m2 replay demo.jsonl
 ```
 
 ## 🛡️ Strict Replay — and When You Want Less Strict
@@ -199,7 +199,7 @@ jobs:
       - name: Validate traces
         run: |
           for t in traces/*.jsonl; do
-            agent-rr validate "$t"
+            agent-m2 validate "$t"
           done
 
       # Layer 2: replay the real agent against its recorded baselines
@@ -225,7 +225,7 @@ A failed replay exits non-zero and prints the divergence diagnosis, so the CI lo
 
 ## 🔒 Security & Redaction
 
-Traces end up in git, so nothing sensitive may enter them. Agent-RR's design guarantee: **redaction runs before hashing and before storage.**
+Traces end up in git, so nothing sensitive may enter them. Agent-M²'s design guarantee: **redaction runs before hashing and before storage.**
 
 - You supply a `redactor(payload) -> redacted_payload` callback to the `Recorder`. It runs on every payload and response *before* the value is hashed or written — raw secrets never touch the trace file or any hash input.
 - Pass the **same redactor** to the `Replayer`: hashes are computed over redacted payloads on both sides, so redaction never causes false divergences.
@@ -246,7 +246,7 @@ with Replayer(trace_file="trace.jsonl", redactor=redact) as rr:
     ...
 ```
 
-What's in a trace, exactly? Line-oriented JSON events: payloads and responses (post-redaction), event ids, parent ids, timestamps, and SHA-256 hashes. Run `agent-rr view trace.jsonl` and inspect every node before you commit it.
+What's in a trace, exactly? Line-oriented JSON events: payloads and responses (post-redaction), event ids, parent ids, timestamps, and SHA-256 hashes. Run `agent-m2 view trace.jsonl` and inspect every node before you commit it.
 
 ### Tamper-evident signing (optional)
 
@@ -254,14 +254,14 @@ What's in a trace, exactly? Line-oriented JSON events: payloads and responses (p
 
 ```python
 with Recorder(agent_id="my-agent", capture_to="trace.jsonl",
-              signing_key="my-secret") as rr:          # or AGENT_RR_SIGNING_KEY env var
+              signing_key="my-secret") as rr:          # or AGENT_M2_SIGNING_KEY env var
     ...
 with Replayer(trace_file="trace.jsonl", signing_key="my-secret",
               require_signatures=True) as rr:           # rejects unsigned/tampered events
     ...
 ```
 
-`agent-rr validate trace.jsonl --require-signatures` does the same check in CI (key from `AGENT_RR_SIGNING_KEY` only — never a CLI flag, to keep secrets out of shell history). Signing is fully backward compatible: without a key, traces are byte-identical to previous versions, and old unsigned traces still load and validate.
+`agent-m2 validate trace.jsonl --require-signatures` does the same check in CI (key from `AGENT_M2_SIGNING_KEY` only — never a CLI flag, to keep secrets out of shell history). Signing is fully backward compatible: without a key, traces are byte-identical to previous versions, and old unsigned traces still load and validate.
 
 ### Encrypting sensitive payloads (optional)
 
@@ -274,14 +274,14 @@ pip install "flight-recorder[crypto]"   # optional cryptography dependency (Fern
 ```python
 from flight_recorder import load_fernet_cipher
 
-cipher = load_fernet_cipher(key)  # key kwarg or AGENT_RR_ENCRYPTION_KEY env var
+cipher = load_fernet_cipher(key)  # key kwarg or AGENT_M2_ENCRYPTION_KEY env var
 with Recorder(agent_id="my-agent", capture_to="trace.jsonl", cipher=cipher) as rr:
     ...
 with Replayer(trace_file="trace.jsonl", cipher=cipher) as rr:
     ...
 ```
 
-Generate a key with `cryptography.fernet.Fernet.generate_key()`. The CLI decrypts via `AGENT_RR_ENCRYPTION_KEY`; reading an encrypted trace without the key fails with a clear error. Any object with `encrypt(text) -> token` / `decrypt(token) -> text` works as a custom cipher (e.g. KMS-backed). Unencrypted traces are untouched — encryption is opt-in and backward compatible.
+Generate a key with `cryptography.fernet.Fernet.generate_key()`. The CLI decrypts via `AGENT_M2_ENCRYPTION_KEY`; reading an encrypted trace without the key fails with a clear error. Any object with `encrypt(text) -> token` / `decrypt(token) -> text` works as a custom cipher (e.g. KMS-backed). Unencrypted traces are untouched — encryption is opt-in and backward compatible.
 
 For large traces, use `flight_recorder.storage.iter_events(path)` to process JSONL line-by-line without loading the full file into memory. `read_events(path)` remains available as the list-returning compatibility helper.
 

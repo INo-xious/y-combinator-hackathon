@@ -173,14 +173,14 @@ export default function SettingsView({
             </div>
           </div>
 
-          {/* About Agent-RR */}
+          {/* About M² */}
           <div className="bg-brand-card/40 border border-brand-border/80 p-4 rounded-xl space-y-2 text-xs">
             <h4 className="font-bold text-white flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-brand-primary" />
-              <span>About Agent-RR</span>
+              <span>About M²</span>
             </h4>
             <p className="text-brand-secondary leading-relaxed">
-              Agent-RR is a deterministic replay engine and time-travel debugger for AI agents built for the Y Combinator Summer Hackathon 2026. Designed to capture model invocations, tool logs, and state changes into cryptographic DAG architectures. Saves API charges by replaying runs locally.
+              M² is a deterministic replay engine and time-travel debugger for AI agents built for the Y Combinator Summer Hackathon 2026. Designed to capture model invocations, tool logs, and state changes into cryptographic DAG architectures. Saves API charges by replaying runs locally.
             </p>
           </div>
         </div>
