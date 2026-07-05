@@ -161,6 +161,39 @@ agent-m2 record demo.jsonl
 agent-m2 replay demo.jsonl
 ```
 
+### 4. Run the frontend console
+
+The repository also includes a Next.js dashboard for browsing sample traces, inspecting replay results, and exploring the Agent-M² product UI.
+
+From the project root:
+
+```bash
+cd /Users/marvelharisson/Downloads/y-combinator-hackathon-main-2/agent-m2-clean
+corepack enable
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser. The dev server defaults to port `3000`; if that port is busy, Next.js will print the alternate local URL in the terminal.
+
+Useful frontend commands:
+
+```bash
+# Start the local development server
+pnpm dev
+
+# Check the frontend for lint issues
+pnpm lint
+
+# Build the production bundle
+pnpm build
+
+# Run the production build locally after pnpm build
+pnpm start
+```
+
+The dashboard reads the bundled demo traces from `traces/` and the API routes under `src/app/api/`, so no production API keys are required just to run the frontend locally.
+
 ## 🛡️ Strict Replay — and When You Want Less Strict
 
 By default, replay is **strict**: if your code requests a different prompt or different tool arguments than the trace recorded, you get a `ReplayDivergence` naming the exact event, the payload diff, and the likely upstream cause. Treat traces like contract tests: an intentional change means re-recording the baseline (a clean, reviewable diff in git).
