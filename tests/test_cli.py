@@ -188,3 +188,67 @@ def test_no_args_returns_argparse_usage_code(capsys):
     assert rc == 2
     assert captured.out == ""
     assert "usage: agent-rr" in captured.err
+
+
+def test_view_writes_self_contained_html(tmp_path, capsys):
+    trace_path = tmp_path / "trace.jsonl"
+    _record_cli_trace(trace_path, capsys)
+
+    rc = main(["view", str(trace_path), "--no-open"])
+    payload = _json_stdout(capsys)
+
+    assert rc == 0
+    assert payload["status"] == "success"
+    assert payload["events_count"] == 7
+    assert payload["opened"] is False
+    html_path = tmp_path / "trace.html"
+    assert payload["html_file"] == str(html_path)
+    html = html_path.read_text(encoding="utf-8")
+    assert html.startswith("<!DOCTYPE html>")
+    # Self-contained: no external scripts, styles, or fetches.
+    assert "http://" not in html and "https://" not in html
+    # Every non-metadata event renders as a node; edges + names present.
+    events = read_events(trace_path)
+    for event in events[1:]:
+        assert f'id="node-{event.event_id}"' in html
+    for name in ("llm_plan", "lookup_customer", "fetch_orders", "llm_summary"):
+        assert name in html
+    assert "marker-end" in html  # at least one drawn edge
+
+
+def test_view_custom_output_path(tmp_path, capsys):
+    trace_path = tmp_path / "trace.jsonl"
+    _record_cli_trace(trace_path, capsys)
+    out_path = tmp_path / "dag" / "custom.html"
+    out_path.parent.mkdir()
+
+    rc = main(["view", str(trace_path), "--no-open", "--output", str(out_path)])
+    payload = _json_stdout(capsys)
+
+    assert rc == 0
+    assert payload["html_file"] == str(out_path)
+    assert out_path.exists()
+
+
+def test_view_missing_file_returns_json_error(tmp_path, capsys):
+    rc = main(["view", str(tmp_path / "missing.jsonl"), "--no-open"])
+    payload = _json_stdout(capsys)
+
+    assert rc == 1
+    assert payload["status"] == "error"
+
+
+def test_replay_divergence_prints_pretty_diagnosis_to_stderr(tmp_path, capsys):
+    trace_path = tmp_path / "different-query.jsonl"
+    _record_different_query_trace(trace_path)
+
+    rc = main(["replay", str(trace_path)])
+    captured = capsys.readouterr()
+
+    assert rc == 1
+    # stdout stays exactly one machine-readable JSON line.
+    assert len(captured.out.splitlines()) == 1
+    assert "ReplayDivergence at root_input_1" in captured.err
+    assert "Expected:" in captured.err
+    assert "Actual:" in captured.err
+    assert "Likely cause:" in captured.err

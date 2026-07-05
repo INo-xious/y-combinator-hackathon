@@ -36,7 +36,7 @@ from .events import (
     EVENT_TYPE_ROOT_INPUT,
     TraceEvent,
 )
-from .hashing import argument_hash, context_hash
+from .hashing import argument_hash, context_hash, new_validation_cache
 
 
 def _fail(message: str) -> None:
@@ -138,7 +138,13 @@ def verify_hashes(events: Iterable[TraceEvent]) -> None:
     for event in events:
         if event.event_type == EVENT_TYPE_METADATA:
             continue
-        expected_argument = argument_hash(event.event_type, event.name, event.payload)
+        validation_cache = new_validation_cache()
+        expected_argument = argument_hash(
+            event.event_type,
+            event.name,
+            event.payload,
+            validation_cache=validation_cache,
+        )
         if expected_argument != event.argument_hash:
             _fail(
                 f"argument_hash mismatch on event {event.event_id} (sequence "
@@ -162,8 +168,24 @@ def verify_hashes(events: Iterable[TraceEvent]) -> None:
             event.historical_response,
             event.status,
             event.error,
+            validation_cache=validation_cache,
         )
         if expected_context != event.context_hash:
+            legacy_context = None
+            if event.error is not None and "traceback" in event.error:
+                legacy_context = context_hash(
+                    parent_hashes,
+                    event.event_type,
+                    event.name,
+                    event.payload,
+                    event.historical_response,
+                    event.status,
+                    event.error,
+                    validation_cache=new_validation_cache(),
+                    include_error_traceback_for_legacy=True,
+                )
+            if legacy_context == event.context_hash:
+                continue
             _fail(
                 f"context_hash mismatch on event {event.event_id} (sequence "
                 f"{event.call_sequence_index}): stored {event.context_hash}, "

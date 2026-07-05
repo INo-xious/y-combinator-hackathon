@@ -66,6 +66,24 @@ def test_pending_is_all_non_metadata_events_in_sequence_order():
     assert scheduler.done is False
 
 
+def test_pending_and_ready_keep_sequence_order_after_completions():
+    events = diamond_trace()
+    meta, root, a, b, c, final = events
+    scheduler = DagScheduler(events)
+
+    scheduler.complete(root.event_id)
+    assert [e.event_id for e in scheduler.pending] == [
+        a.event_id, b.event_id, c.event_id, final.event_id
+    ]
+    assert [e.event_id for e in scheduler.ready_events()] == [a.event_id, b.event_id]
+
+    scheduler.complete(b.event_id)
+    assert [e.event_id for e in scheduler.pending] == [
+        a.event_id, c.event_id, final.event_id
+    ]
+    assert [e.event_id for e in scheduler.ready_events()] == [a.event_id]
+
+
 # --- unlocking ------------------------------------------------------------------
 
 

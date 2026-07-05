@@ -19,10 +19,10 @@ from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from typing import Any, Optional
 
-from .hashing import validate_json_value
+from .hashing import ValidationCache, validate_json_value
 
 SCHEMA_VERSION = "1.0"
-RECORDER_VERSION = "0.1.0"
+RECORDER_VERSION = "0.1.1"
 
 EVENT_TYPE_METADATA = "metadata"
 EVENT_TYPE_ROOT_INPUT = "root_input"
@@ -98,7 +98,7 @@ class TraceEvent:
     context_hash: Optional[str]
     latency_ms: Optional[int]
 
-    def validate(self) -> None:
+    def validate(self, *, validation_cache: ValidationCache | None = None) -> None:
         """Raise ValueError unless this event satisfies every per-event invariant."""
         _check_uuid_str(self.event_id, "event_id")
         _check_uuid_str(self.run_id, "run_id")
@@ -149,7 +149,7 @@ class TraceEvent:
             self._validate_error_dict()
 
         try:
-            validate_json_value(self.payload)
+            validate_json_value(self.payload, validation_cache=validation_cache)
         except ValueError as exc:
             _fail(f"payload is not strict JSON: {exc}")
         if is_metadata:
@@ -159,7 +159,10 @@ class TraceEvent:
             if self.historical_response is None:
                 _fail("historical_response is required for successful boundary calls")
             try:
-                validate_json_value(self.historical_response)
+                validate_json_value(
+                    self.historical_response,
+                    validation_cache=validation_cache,
+                )
             except ValueError as exc:
                 _fail(f"historical_response is not strict JSON: {exc}")
         elif self.historical_response is not None:
@@ -228,6 +231,10 @@ class TraceEvent:
     def to_dict(self) -> dict:
         """Project to a plain dict (deep-copied) in schema field order."""
         return asdict(self)
+
+    def to_json_dict(self) -> dict:
+        """Project to a shallow, schema-ordered dict for immediate JSON writing."""
+        return {name: getattr(self, name) for name in EVENT_FIELDS}
 
     @classmethod
     def from_dict(cls, data: Any) -> "TraceEvent":

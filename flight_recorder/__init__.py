@@ -21,9 +21,18 @@ from .events import (
 )
 from .hashing import argument_hash, canonical_json, context_hash, validate_json_value
 from .recorder import Recorder
-from .replayer import DagScheduler, Replayer, ReplayedError, TopologicalReplayer
+from .replayer import (
+    DagScheduler,
+    Replayer,
+    ReplayedError,
+    TopologicalReplayer,
+    REPLAY_MODE_SEMANTIC,
+    REPLAY_MODE_STRICT,
+    REPLAY_MODE_STRUCTURED,
+    REPLAY_MODES,
+)
 from .report import ReplayReport, TraceValidationReport
-from .storage import TraceWriter, TruncatedTraceWarning, read_events
+from .storage import TraceWriter, TruncatedTraceWarning, iter_events, read_events
 
 __all__ = [
     "BOUNDARY_EVENT_TYPES",
@@ -36,6 +45,10 @@ __all__ = [
     "LifecycleError",
     "PrematureEventError",
     "RECORDER_VERSION",
+    "REPLAY_MODE_SEMANTIC",
+    "REPLAY_MODE_STRICT",
+    "REPLAY_MODE_STRUCTURED",
+    "REPLAY_MODES",
     "Recorder",
     "ReplayDivergence",
     "ReplayedError",
@@ -52,6 +65,7 @@ __all__ = [
     "argument_hash",
     "canonical_json",
     "context_hash",
+    "iter_events",
     "read_events",
     "validate_json_value",
     "validate_trace",

@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
-from typing import Union
+from typing import Iterator, Union
 
 from .events import TraceEvent
 
@@ -43,8 +43,8 @@ class TraceWriter:
 
     def append(self, event: TraceEvent) -> None:
         """Validate *event*, write it as one JSON line, and flush."""
-        event.validate()
-        line = json.dumps(event.to_dict(), ensure_ascii=False, allow_nan=False)
+        event.validate(validation_cache=getattr(event, "_validation_cache", None))
+        line = json.dumps(event.to_json_dict(), ensure_ascii=False, allow_nan=False)
         self._file.write(line + "\n")
         self._file.flush()
 
@@ -60,8 +60,8 @@ class TraceWriter:
         return False
 
 
-def read_events(path: Union[str, Path]) -> list[TraceEvent]:
-    """Read and per-event-validate every event in a JSONL trace file.
+def iter_events(path: Union[str, Path]) -> Iterator[TraceEvent]:
+    """Yield per-event-validated events from a JSONL trace file.
 
     Recovery rule: if the *final* line does not parse as JSON it is treated
     as a crash-truncated write — a ``TruncatedTraceWarning`` is emitted and
@@ -69,31 +69,47 @@ def read_events(path: Union[str, Path]) -> list[TraceEvent]:
     a line that parses but is not a valid event, raises ``ValueError``.
     """
     path = Path(path)
-    text = path.read_text(encoding="utf-8")
-    if text == "":
-        return []
-    lines = text.split("\n")
-    if lines[-1] == "":  # complete file: final line ended with "\n"
-        lines.pop()
-    events: list[TraceEvent] = []
-    last = len(lines) - 1
-    for index, line in enumerate(lines):
-        try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
-            if index == last:
-                warnings.warn(
-                    f"{path}: final line {index + 1} is incomplete "
-                    "(crash-interrupted write); skipping it",
-                    TruncatedTraceWarning,
-                    stacklevel=2,
-                )
-                break
-            raise ValueError(
-                f"corrupt trace {path}: line {index + 1} is not valid JSON"
-            ) from None
-        try:
-            events.append(TraceEvent.from_dict(data))
-        except ValueError as exc:
-            raise ValueError(f"corrupt trace {path}: line {index + 1}: {exc}") from exc
-    return events
+    pending_line: str | None = None
+    pending_line_number = 0
+    with path.open(encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            if pending_line is not None:
+                yield _event_from_line(path, pending_line_number, pending_line, is_final=False)
+            pending_line = line
+            pending_line_number = line_number
+    if pending_line is not None:
+        event = _event_from_line(path, pending_line_number, pending_line, is_final=True)
+        if event is not None:
+            yield event
+
+
+def _event_from_line(
+    path: Path,
+    line_number: int,
+    line: str,
+    *,
+    is_final: bool,
+) -> TraceEvent | None:
+    try:
+        data = json.loads(line)
+    except json.JSONDecodeError:
+        if is_final:
+            warnings.warn(
+                f"{path}: final line {line_number} is incomplete "
+                "(crash-interrupted write); skipping it",
+                TruncatedTraceWarning,
+                stacklevel=2,
+            )
+            return None
+        raise ValueError(
+            f"corrupt trace {path}: line {line_number} is not valid JSON"
+        ) from None
+    try:
+        return TraceEvent.from_dict(data)
+    except ValueError as exc:
+        raise ValueError(f"corrupt trace {path}: line {line_number}: {exc}") from exc
+
+
+def read_events(path: Union[str, Path]) -> list[TraceEvent]:
+    """Read and per-event-validate every event in a JSONL trace file."""
+    return list(iter_events(path))

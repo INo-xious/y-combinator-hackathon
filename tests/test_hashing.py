@@ -238,6 +238,44 @@ def test_context_hash_differs_by_status_and_error():
     assert failed != other_error
 
 
+def test_context_hash_ignores_diagnostic_traceback():
+    error_a = {
+        "type": "KeyError",
+        "message": "'orders'",
+        "traceback": "Traceback from /Users/alice/project/agent.py",
+    }
+    error_b = {
+        "type": "KeyError",
+        "message": "'orders'",
+        "traceback": "Traceback from /home/bob/project/agent.py",
+    }
+    assert _ctx(historical_response=None, status="error", error=error_a) == _ctx(
+        historical_response=None,
+        status="error",
+        error=error_b,
+    )
+
+
+def test_legacy_context_hash_can_include_traceback_for_verification():
+    error = {
+        "type": "KeyError",
+        "message": "'orders'",
+        "traceback": "Traceback from /Users/alice/project/agent.py",
+    }
+    stable = _ctx(historical_response=None, status="error", error=error)
+    legacy = context_hash(
+        [HEX64],
+        "tool_call",
+        "fetch_orders",
+        {"customer_id": 123, "limit": 5},
+        None,
+        "error",
+        error,
+        include_error_traceback_for_legacy=True,
+    )
+    assert stable != legacy
+
+
 def test_context_hash_differs_by_response():
     assert _ctx(historical_response={"orders": [1]}) != _ctx(historical_response={"orders": [2]})
 

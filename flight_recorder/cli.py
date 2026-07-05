@@ -10,15 +10,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+import webbrowser
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 
 from .dag import validate_trace, verify_hashes
 from .errors import ReplayDivergence
 from .recorder import Recorder
 from .report import TraceValidationReport
 from .replayer import Replayer
-from .storage import read_events
+from .storage import iter_events, read_events
+from .viewer import write_trace_html
 
 DEMO_AGENT_ID = "demo-agent"
 DEMO_QUERY = "Look up customer 123 and summarize their last 5 orders."
@@ -103,7 +106,7 @@ def _run_record(trace_file: Path, *, overwrite: bool) -> int:
         ) as recorder:
             _run_demo_agent(recorder, execute_calls=True)
             run_id = recorder.run_id
-        events_count = len(read_events(trace_file))
+        events_count = sum(1 for _ in iter_events(trace_file))
     except Exception as exc:
         _emit(_error_payload(exc, trace_file))
         return 1
@@ -125,6 +128,9 @@ def _run_replay(trace_file: Path) -> int:
             _run_demo_agent(replayer, execute_calls=False)
         report = replayer.report
     except ReplayDivergence as exc:
+        # Humans get the pretty diagnosis on stderr; stdout stays one JSON
+        # object so CI scripts keep parsing exactly what they did before.
+        print(exc.pretty(), file=sys.stderr)
         payload = {"status": "divergence", **exc.detail(), "trace_file": str(trace_file)}
         _emit(payload)
         return 1
@@ -168,6 +174,42 @@ def _run_validate(trace_file: Path) -> int:
     return 0
 
 
+def _run_view(
+    trace_file: Path,
+    *,
+    output_file: Optional[Path],
+    open_browser: bool,
+) -> int:
+    try:
+        events = read_events(trace_file)
+        validate_trace(events, require_complete=True)
+        verify_hashes(events)
+        html_file = write_trace_html(events, trace_file, output_file)
+    except Exception as exc:
+        _emit(_error_payload(exc, trace_file))
+        return 1
+
+    opened = False
+    if open_browser:
+        # Browser launch failures (headless CI, no default browser) must not
+        # fail the command: the HTML file already exists and is the product.
+        try:
+            opened = webbrowser.open(html_file.resolve().as_uri())
+        except Exception:
+            opened = False
+
+    _emit(
+        {
+            "status": "success",
+            "trace_file": str(trace_file),
+            "html_file": str(html_file),
+            "events_count": len(events),
+            "opened": opened,
+        }
+    )
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agent-rr",
@@ -189,6 +231,22 @@ def _build_parser() -> argparse.ArgumentParser:
     validate = subparsers.add_parser("validate", help="validate a trace file and hashes")
     validate.add_argument("trace_file", type=Path)
 
+    view = subparsers.add_parser(
+        "view", help="render the trace's causal DAG to HTML and open it"
+    )
+    view.add_argument("trace_file", type=Path)
+    view.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="HTML output path (default: trace file with .html suffix)",
+    )
+    view.add_argument(
+        "--no-open",
+        action="store_true",
+        help="write the HTML file without opening a browser",
+    )
+
     return parser
 
 
@@ -206,5 +264,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_replay(args.trace_file)
     if args.command == "validate":
         return _run_validate(args.trace_file)
+    if args.command == "view":
+        return _run_view(
+            args.trace_file,
+            output_file=args.output,
+            open_browser=not args.no_open,
+        )
     parser.error(f"unknown command: {args.command}")
     return 2

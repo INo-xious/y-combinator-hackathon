@@ -7,6 +7,7 @@ import pytest
 
 from conftest import make_event, make_metadata, make_trace
 from flight_recorder.dag import validate_trace, verify_hashes
+from flight_recorder.hashing import context_hash
 
 
 @pytest.fixture
@@ -184,6 +185,67 @@ def test_tampered_status_and_error_detected_via_context_hash(trace):
     bad = _replace(trace, 3, error={"type": "KeyError", "message": "tampered"})
     with pytest.raises(ValueError, match="context_hash mismatch"):
         verify_hashes(bad)
+
+
+def test_error_traceback_is_not_part_of_context_hash(trace):
+    tool = trace[3]
+    with_traceback = _replace(
+        trace,
+        3,
+        error={
+            "type": tool.error["type"],
+            "message": tool.error["message"],
+            "traceback": "Traceback from /Users/alice/project/agent.py",
+        },
+    )
+    verify_hashes(with_traceback)
+
+    edited_traceback = _replace(
+        with_traceback,
+        3,
+        error={
+            "type": tool.error["type"],
+            "message": tool.error["message"],
+            "traceback": "Traceback from /home/bob/project/agent.py",
+        },
+    )
+    verify_hashes(edited_traceback)
+
+
+def test_error_type_and_message_still_drive_context_hash(trace):
+    tool = trace[3]
+    bad = _replace(
+        trace,
+        3,
+        error={
+            "type": tool.error["type"],
+            "message": "tampered",
+            "traceback": "Traceback from /Users/alice/project/agent.py",
+        },
+    )
+    with pytest.raises(ValueError, match="context_hash mismatch"):
+        verify_hashes(bad)
+
+
+def test_legacy_error_hash_with_traceback_still_verifies(trace):
+    tool = trace[3]
+    error = {
+        "type": tool.error["type"],
+        "message": tool.error["message"],
+        "traceback": "Traceback from /Users/alice/project/agent.py",
+    }
+    legacy_context = context_hash(
+        [trace[2].context_hash],
+        tool.event_type,
+        tool.name,
+        tool.payload,
+        tool.historical_response,
+        tool.status,
+        error,
+        include_error_traceback_for_legacy=True,
+    )
+    legacy = _replace(trace, 3, error=error, context_hash=legacy_context)
+    verify_hashes(legacy[:4])
 
 
 def test_parent_order_is_pinned_into_context_hash(trace):

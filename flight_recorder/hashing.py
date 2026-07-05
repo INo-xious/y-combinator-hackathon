@@ -26,10 +26,11 @@ Hash semantics (``timestamp``, ``latency_ms``, ``event_id``, ``run_id`` and
 - ``argument_hash`` = SHA-256(canonical_json({event_type, name, payload}))
   with payload post-redaction; used for replay matching; null on metadata.
 - ``context_hash`` = SHA-256(canonical_json({parent_context_hashes,
-  event_type, name, payload, historical_response, status, error})) where
+  event_type, name, payload, historical_response, status, stable_error})) where
   ``parent_context_hashes`` lists the parents' context hashes in
   ``parent_event_ids`` order (order is part of the hash — pinned, not
-  implementation-defined); null on metadata; ``[]`` on root_input.
+  implementation-defined); ``stable_error`` excludes diagnostic tracebacks;
+  null on metadata; ``[]`` on root_input.
 """
 
 from __future__ import annotations
@@ -41,13 +42,28 @@ import re
 from typing import Any
 
 _HEX64_RE = re.compile(r"\A[0-9a-f]{64}\Z")
+ValidationCache = dict[int, Any]
 
 
-def validate_json_value(obj: Any, path: str = "$") -> None:
+def new_validation_cache() -> ValidationCache:
+    """Return an event-local strict JSON validation cache."""
+    return {}
+
+
+def validate_json_value(
+    obj: Any,
+    path: str = "$",
+    *,
+    validation_cache: ValidationCache | None = None,
+) -> None:
     """Raise ValueError unless *obj* canonicalizes deterministically.
 
     ``path`` locates the offending value in error messages (``$.key[3]``).
     """
+    if validation_cache is not None:
+        obj_id = id(obj)
+        if validation_cache.get(obj_id) is obj:
+            return
     obj_type = type(obj)
     if obj_type is dict:
         for key, value in obj.items():
@@ -56,10 +72,18 @@ def validate_json_value(obj: Any, path: str = "$") -> None:
                     f"non-string dict key {key!r} ({type(key).__name__}) at {path}: "
                     "json.dumps would silently stringify it"
                 )
-            validate_json_value(value, f"{path}.{key}")
+            validate_json_value(
+                value,
+                f"{path}.{key}",
+                validation_cache=validation_cache,
+            )
     elif obj_type is list:
         for index, item in enumerate(obj):
-            validate_json_value(item, f"{path}[{index}]")
+            validate_json_value(
+                item,
+                f"{path}[{index}]",
+                validation_cache=validation_cache,
+            )
     elif obj_type is float:
         if math.isnan(obj) or math.isinf(obj):
             raise ValueError(f"NaN and Infinity are not allowed at {path}")
@@ -72,19 +96,35 @@ def validate_json_value(obj: Any, path: str = "$") -> None:
             f"unsupported type {obj_type.__name__!r} at {path}: only exact "
             "dict/list/str/int/float/bool/None values canonicalize deterministically"
         )
+    if validation_cache is not None:
+        validation_cache[id(obj)] = obj
 
 
-def canonical_json(obj: Any) -> str:
+def canonical_json(
+    obj: Any,
+    *,
+    validation_cache: ValidationCache | None = None,
+) -> str:
     """Return the canonical JSON text of *obj*, validating strictness first."""
-    validate_json_value(obj)
+    validate_json_value(obj, validation_cache=validation_cache)
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
 
 
-def _sha256_of_canonical(obj: Any) -> str:
-    return hashlib.sha256(canonical_json(obj).encode("utf-8")).hexdigest()
+def _sha256_of_canonical(
+    obj: Any,
+    *,
+    validation_cache: ValidationCache | None = None,
+) -> str:
+    return hashlib.sha256(canonical_json(obj, validation_cache=validation_cache).encode("utf-8")).hexdigest()
 
 
-def argument_hash(event_type: str, name: str | None, payload: Any) -> str:
+def argument_hash(
+    event_type: str,
+    name: str | None,
+    payload: Any,
+    *,
+    validation_cache: ValidationCache | None = None,
+) -> str:
     """Hash the request side of an event, for replay matching.
 
     ``payload`` must already be redacted — the raw value never touches a hash.
@@ -92,7 +132,27 @@ def argument_hash(event_type: str, name: str | None, payload: Any) -> str:
     """
     if event_type == "metadata":
         raise ValueError("metadata events have no argument_hash (the field is null)")
-    return _sha256_of_canonical({"event_type": event_type, "name": name, "payload": payload})
+    return _sha256_of_canonical(
+        {"event_type": event_type, "name": name, "payload": payload},
+        validation_cache=validation_cache,
+    )
+
+
+def stable_error_for_hash(
+    error: dict | None,
+    *,
+    include_traceback: bool = False,
+) -> dict | None:
+    """Return the deterministic error payload used by ``context_hash``."""
+    if error is None:
+        return None
+    if include_traceback:
+        return error
+    return {
+        key: error[key]
+        for key in ("type", "message")
+        if key in error
+    }
 
 
 def context_hash(
@@ -103,13 +163,18 @@ def context_hash(
     historical_response: Any,
     status: str,
     error: dict | None,
+    *,
+    validation_cache: ValidationCache | None = None,
+    include_error_traceback_for_legacy: bool = False,
 ) -> str:
     """Hash an event plus its causal ancestry.
 
     ``parent_context_hashes`` must be the parents' context hashes in
     ``parent_event_ids`` order; any upstream change ripples downstream.
     ``payload`` and ``historical_response`` must already be redacted.
-    Metadata events carry a null context_hash, so hashing one is a bug.
+    ``error.traceback`` is intentionally excluded from new hashes because it
+    contains machine-local diagnostics such as absolute file paths. Metadata
+    events carry a null context_hash, so hashing one is a bug.
     """
     if event_type == "metadata":
         raise ValueError("metadata events have no context_hash (the field is null)")
@@ -129,6 +194,10 @@ def context_hash(
             "payload": payload,
             "historical_response": historical_response,
             "status": status,
-            "error": error,
-        }
+            "error": stable_error_for_hash(
+                error,
+                include_traceback=include_error_traceback_for_legacy,
+            ),
+        },
+        validation_cache=validation_cache,
     )

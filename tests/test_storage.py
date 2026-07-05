@@ -7,7 +7,7 @@ import warnings
 import pytest
 
 from conftest import make_trace
-from flight_recorder.storage import TraceWriter, TruncatedTraceWarning, read_events
+from flight_recorder.storage import TraceWriter, TruncatedTraceWarning, iter_events, read_events
 
 
 @pytest.fixture
@@ -83,10 +83,26 @@ def test_round_trip_preserves_events(trace_path, trace):
     assert read_events(trace_path) == trace
 
 
+def test_iter_events_preserves_round_trip(trace_path, trace):
+    assert list(iter_events(trace_path)) == trace
+
+
+def test_iter_events_yields_before_parsing_the_rest(trace_path, trace):
+    lines = trace_path.read_text(encoding="utf-8").splitlines()
+    lines[1] = "not valid json yet"
+    trace_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    events = iter_events(trace_path)
+    assert next(events) == trace[0]
+    with pytest.raises(ValueError, match="line 2 is not valid JSON"):
+        next(events)
+
+
 def test_read_empty_file_returns_no_events(tmp_path):
     path = tmp_path / "empty.jsonl"
     path.touch()
     assert read_events(path) == []
+    assert list(iter_events(path)) == []
 
 
 def test_read_missing_file_raises(tmp_path):
@@ -110,12 +126,30 @@ def test_truncated_final_line_warns_and_returns_prior_events(trace_path, trace):
     assert events == trace[:-1]
 
 
+def test_iter_events_truncated_final_line_warns_and_returns_prior_events(trace_path, trace):
+    text = trace_path.read_text(encoding="utf-8")
+    trace_path.write_text(text[:-20], encoding="utf-8")
+    with pytest.warns(TruncatedTraceWarning, match="crash-interrupted write"):
+        events = list(iter_events(trace_path))
+    assert events == trace[:-1]
+
+
 def test_corrupt_middle_line_raises(trace_path):
     lines = trace_path.read_text(encoding="utf-8").splitlines()
     lines[2] = '{"event_id": '
     trace_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="line 3 is not valid JSON"):
         read_events(trace_path)
+
+
+def test_iter_events_corrupt_middle_line_raises(trace_path, trace):
+    lines = trace_path.read_text(encoding="utf-8").splitlines()
+    lines[2] = '{"event_id": '
+    trace_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    events = iter_events(trace_path)
+    assert next(events) == trace[0]
+    with pytest.raises(ValueError, match="line 3 is not valid JSON"):
+        list(events)
 
 
 def test_blank_middle_line_raises(trace_path):

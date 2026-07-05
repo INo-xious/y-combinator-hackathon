@@ -77,6 +77,40 @@ def _identity(value: Any) -> Any:
     return value
 
 
+REPLAY_MODE_STRICT = "strict"
+REPLAY_MODE_STRUCTURED = "structured"
+REPLAY_MODE_SEMANTIC = "semantic"
+REPLAY_MODES = (REPLAY_MODE_STRICT, REPLAY_MODE_STRUCTURED, REPLAY_MODE_SEMANTIC)
+
+
+def _json_schema_shape(value: Any) -> tuple:
+    """Return a deterministic JSON-schema-ish shape for tolerant replay.
+
+    Structured replay intentionally ignores primitive values and compares the
+    JSON shape: object keys, nested value types, and array item shapes.
+    """
+
+    value_type = type(value)
+    if value_type is dict:
+        return (
+            "object",
+            tuple((key, _json_schema_shape(value[key])) for key in sorted(value)),
+        )
+    if value_type is list:
+        return ("array", tuple(sorted({_json_schema_shape(item) for item in value})))
+    if value_type is str:
+        return ("string",)
+    if value_type is int:
+        return ("integer",)
+    if value_type is float:
+        return ("number",)
+    if value_type is bool:
+        return ("boolean",)
+    if value is None:
+        return ("null",)
+    return (value_type.__name__,)
+
+
 def _request_summary(
     event_type: str,
     name: Optional[str],
@@ -159,18 +193,20 @@ class DagScheduler:
                         "which is not a schedulable event in this trace"
                     )
         self._consumed: set[str] = set()
+        self._pending_ids: set[str] = set(self._events)
+        self._ordered_events = sorted(
+            self._events.values(),
+            key=lambda event: event.call_sequence_index,
+        )
 
     @property
     def pending(self) -> list[TraceEvent]:
         """Unconsumed events, ascending ``call_sequence_index``."""
-        return sorted(
-            (e for e in self._events.values() if e.event_id not in self._consumed),
-            key=lambda e: e.call_sequence_index,
-        )
+        return [e for e in self._ordered_events if e.event_id in self._pending_ids]
 
     @property
     def done(self) -> bool:
-        return len(self._consumed) == len(self._events)
+        return not self._pending_ids
 
     def _get(self, event_id: str) -> TraceEvent:
         try:
@@ -186,7 +222,7 @@ class DagScheduler:
         Consumed events are not ready (readiness is a property of pending
         events only)."""
         event = self._get(event_id)
-        if event.event_id in self._consumed:
+        if event.event_id not in self._pending_ids:
             return False
         return all(pid in self._consumed for pid in event.parent_event_ids)
 
@@ -194,8 +230,9 @@ class DagScheduler:
         """The ready subset of :attr:`pending`, ascending sequence order."""
         return [
             e
-            for e in self.pending
-            if all(pid in self._consumed for pid in e.parent_event_ids)
+            for e in self._ordered_events
+            if e.event_id in self._pending_ids
+            and all(pid in self._consumed for pid in e.parent_event_ids)
         ]
 
     def missing_parents(self, event_id: str) -> list[str]:
@@ -214,6 +251,7 @@ class DagScheduler:
                 f"event {event_id} is not ready: parents not consumed: {missing}"
             )
         self._consumed.add(event_id)
+        self._pending_ids.remove(event_id)
 
 
 class Replayer:
@@ -234,11 +272,20 @@ class Replayer:
         self,
         trace_file: Union[str, Path],
         redactor: Optional[Callable[[Any], Any]] = None,
+        *,
+        mode: str = REPLAY_MODE_STRICT,
+        semantic_matcher: Optional[Callable[[Any, Any], bool]] = None,
     ):
         if redactor is not None and not callable(redactor):
             raise TypeError("redactor must be a callable: payload -> redacted_payload")
+        if mode not in REPLAY_MODES:
+            raise ValueError(f"mode must be one of {REPLAY_MODES}, got {mode!r}")
+        if semantic_matcher is not None and not callable(semantic_matcher):
+            raise TypeError("semantic_matcher must be callable when provided")
         self._trace_file = Path(trace_file)
         self._redactor = redactor if redactor is not None else _identity
+        self._mode = mode
+        self._semantic_matcher = semantic_matcher
         self._events: Optional[list[TraceEvent]] = None
         self._entered = False
         self._closed = False
@@ -421,13 +468,25 @@ class Replayer:
             reason = "name mismatch"
         elif candidate.parent_event_ids != parents:
             reason = "parent_event_ids mismatch"
-        elif candidate.argument_hash != computed_hash:
-            reason = "final output mismatch" if final else "argument_hash mismatch"
         else:
-            reason = None
+            reason = self._payload_mismatch_reason(
+                candidate,
+                computed_hash,
+                redacted_payload,
+                final=final,
+            )
 
         if reason is not None:
-            error_cls = FinalOutputMismatch if reason == "final output mismatch" else ReplayDivergence
+            final_mismatch_reasons = (
+                "final output mismatch",
+                "structured final output mismatch",
+                "semantic final output mismatch",
+            )
+            error_cls = (
+                FinalOutputMismatch
+                if reason in final_mismatch_reasons
+                else ReplayDivergence
+            )
             self._fail_divergence(
                 error_cls(
                     reason,
@@ -447,6 +506,34 @@ class Replayer:
             self._final_output_matched = True
         return candidate
 
+    def _payload_mismatch_reason(
+        self,
+        candidate: TraceEvent,
+        computed_hash: str,
+        redacted_payload: Any,
+        *,
+        final: bool,
+    ) -> Optional[str]:
+        if candidate.argument_hash == computed_hash:
+            return None
+
+        if self._mode == REPLAY_MODE_STRUCTURED:
+            if _json_schema_shape(candidate.payload) == _json_schema_shape(redacted_payload):
+                return None
+            return "structured final output mismatch" if final else "structured payload mismatch"
+
+        if self._mode == REPLAY_MODE_SEMANTIC:
+            if self._semantic_matcher is None:
+                return "semantic matcher unavailable"
+            try:
+                if self._semantic_matcher(candidate.payload, redacted_payload):
+                    return None
+            except Exception as exc:
+                return f"semantic matcher error: {type(exc).__name__}: {exc}"
+            return "semantic final output mismatch" if final else "semantic payload mismatch"
+
+        return "final output mismatch" if final else "argument_hash mismatch"
+
     def _unconsumed_event_ids(self) -> list[str]:
         """Ids of not-yet-consumed events. The sequence engine consumes in
         file order, so this is the tail from the cursor; the topological
@@ -457,10 +544,34 @@ class Replayer:
 
     def _fail_divergence(self, err: ReplayDivergence, *, final: bool = False) -> None:
         """Record *err* in the report bookkeeping and raise it."""
+        err.parent_labels = self._parent_labels_for(err)
         self._divergence = err.detail()
         if final:
             self._final_output_matched = False
         raise err
+
+    def _parent_labels_for(self, err: ReplayDivergence) -> list[str]:
+        """Human labels ("llm_call_2: llm_plan") for the diverging event's
+        recorded parents, so ``ReplayDivergence.pretty()`` can point at the
+        upstream cause instead of bare UUIDs."""
+        if self._events is None:
+            return []
+        anchor = err.expected if isinstance(err.expected, dict) else None
+        parent_ids = (anchor or {}).get("parent_event_ids")
+        if not isinstance(parent_ids, list):
+            return []
+        by_id = {e.event_id: e for e in self._events}
+        labels = []
+        for parent_id in parent_ids:
+            event = by_id.get(parent_id)
+            if event is None:
+                labels.append(parent_id)
+            else:
+                label = f"{event.event_type}_{event.call_sequence_index}"
+                if event.name:
+                    label += f": {event.name}"
+                labels.append(label)
+        return labels
 
     def _reraise_historical_error(self, event: TraceEvent) -> None:
         error_type = event.error["type"]
@@ -544,8 +655,16 @@ class TopologicalReplayer(Replayer):
         self,
         trace_file: Union[str, Path],
         redactor: Optional[Callable[[Any], Any]] = None,
+        *,
+        mode: str = REPLAY_MODE_STRICT,
+        semantic_matcher: Optional[Callable[[Any, Any], bool]] = None,
     ):
-        super().__init__(trace_file, redactor=redactor)
+        super().__init__(
+            trace_file,
+            redactor=redactor,
+            mode=mode,
+            semantic_matcher=semantic_matcher,
+        )
         self._scheduler: Optional[DagScheduler] = None
 
     def __enter__(self) -> "TopologicalReplayer":
@@ -593,7 +712,10 @@ class TopologicalReplayer(Replayer):
             for e in pending
             if e.event_type == event_type
             and e.name == name
-            and e.argument_hash == computed_hash
+            and self._payload_mismatch_reason(
+                e, computed_hash, redacted_payload, final=final
+            )
+            is None
         ]
         if not exact:
             near = [
@@ -602,7 +724,9 @@ class TopologicalReplayer(Replayer):
             if len(near) == 1:
                 # Unambiguous target, wrong payload: keep the Session-3 reason
                 # vocabulary (and FinalOutputMismatch contract) for this case.
-                reason = "final output mismatch" if final else "argument_hash mismatch"
+                reason = self._payload_mismatch_reason(
+                    near[0], computed_hash, redacted_payload, final=final
+                )
                 error_cls = FinalOutputMismatch if final else ReplayDivergence
                 self._fail_divergence(
                     error_cls(

@@ -44,6 +44,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional, Union
 
+from .capture import CapturedResponse
 from .errors import FinalOutputNotCalled, LifecycleError
 from .events import (
     EVENT_TYPE_FINAL_OUTPUT,
@@ -57,7 +58,7 @@ from .events import (
     STATUS_OK,
     TraceEvent,
 )
-from .hashing import argument_hash, context_hash
+from .hashing import argument_hash, context_hash, new_validation_cache
 from .storage import TraceWriter
 
 
@@ -257,7 +258,12 @@ class Recorder:
         redacted_payload = self._redactor(payload)
         # Hashing validates strict JSON; doing it before call() runs means an
         # unrecordable payload fails before any side effect happens.
-        argument_hash(event_type, name, redacted_payload)
+        argument_hash(
+            event_type,
+            name,
+            redacted_payload,
+            validation_cache=new_validation_cache(),
+        )
 
         started = time.perf_counter()
         try:
@@ -280,19 +286,23 @@ class Recorder:
             self._write(event)
             raise  # always re-raise the original exception (PLAN §2)
         latency_ms = _elapsed_ms(started)
+        raw_response = response.raw if isinstance(response, CapturedResponse) else response
+        stored_response = (
+            response.stored if isinstance(response, CapturedResponse) else response
+        )
 
         event = self._build_event(
             event_type=event_type,
             name=name,
             payload=redacted_payload,
             parent_event_ids=parents,
-            historical_response=self._redactor(response),
+            historical_response=self._redactor(stored_response),
             status=STATUS_OK,
             error=None,
             latency_ms=latency_ms,
         )
         self._write(event)
-        return response, event.event_id
+        return raw_response, event.event_id
 
     def _require_active(self, method: str) -> None:
         if not self._entered:
@@ -334,7 +344,24 @@ class Recorder:
     ) -> TraceEvent:
         # payload and historical_response must already be redacted.
         parent_context_hashes = [self._context_hashes[p] for p in parent_event_ids]
-        return TraceEvent(
+        validation_cache = new_validation_cache()
+        arg_hash = argument_hash(
+            event_type,
+            name,
+            payload,
+            validation_cache=validation_cache,
+        )
+        ctx_hash = context_hash(
+            parent_context_hashes,
+            event_type,
+            name,
+            payload,
+            historical_response,
+            status,
+            error,
+            validation_cache=validation_cache,
+        )
+        event = TraceEvent(
             event_id=str(uuid.uuid4()),
             run_id=self._run_id,
             agent_id=self._agent_id,
@@ -347,18 +374,12 @@ class Recorder:
             historical_response=historical_response,
             status=status,
             error=error,
-            argument_hash=argument_hash(event_type, name, payload),
-            context_hash=context_hash(
-                parent_context_hashes,
-                event_type,
-                name,
-                payload,
-                historical_response,
-                status,
-                error,
-            ),
+            argument_hash=arg_hash,
+            context_hash=ctx_hash,
             latency_ms=latency_ms,
         )
+        event._validation_cache = validation_cache
+        return event
 
     def _write(self, event: TraceEvent) -> None:
         self._writer.append(event)  # validates, writes one line, flushes

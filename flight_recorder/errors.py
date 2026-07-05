@@ -6,7 +6,50 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Optional
+
+# reason -> one-line human diagnosis, filled with .format(parent=...).
+_LIKELY_CAUSES = {
+    "argument_hash mismatch": (
+        "Your agent changed the arguments it generates after {parent}."
+    ),
+    "name mismatch": (
+        "Your agent now calls a different LLM/tool at this point than it did "
+        "when the trace was recorded."
+    ),
+    "event_type mismatch": (
+        "Your agent swapped an LLM call for a tool call (or vice versa) at "
+        "this point in the flow."
+    ),
+    "parent_event_ids mismatch": (
+        "Your agent rewired the data flow: this call now depends on different "
+        "upstream events than the recorded run."
+    ),
+    "trace exhausted": (
+        "Your agent makes more calls than the recorded run — an extra step "
+        "was added after recording."
+    ),
+    "final output mismatch": (
+        "Your agent produced a different final answer from the same recorded "
+        "inputs — check logic that post-processes the last response after {parent}."
+    ),
+    "structured payload mismatch": (
+        "The JSON *shape* of the arguments changed after {parent} (structured "
+        "mode ignores values, so a key was added, removed, or re-typed)."
+    ),
+    "unconsumed events at exit": (
+        "Your agent makes fewer calls than the recorded run — a recorded step "
+        "was removed or skipped."
+    ),
+}
+
+
+def _compact(value: Any) -> str:
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    except (TypeError, ValueError):
+        return repr(value)
 
 
 class FlightRecorderError(Exception):
@@ -69,6 +112,64 @@ class ReplayDivergence(FlightRecorderError):
         self.actual = actual
         self.at_sequence_index = at_sequence_index
         self.at_event_id = at_event_id
+        # "{event_type}_{seq}: {name}" labels for the expected event's parents,
+        # attached by the replayer (which can see the whole trace) so pretty()
+        # can say "Parent: llm_call_2" instead of a bare UUID.
+        self.parent_labels: list[str] = []
+
+    def pretty(self) -> str:
+        """Multi-line, human-first rendering of this divergence.
+
+        Format::
+
+            ReplayDivergence at tool_call_3: search_flights
+            Expected: {"from": "London", "limit": 5, "to": "Tokyo"}
+            Actual:   {"from": "London", "limit": 10, "to": "Tokyo"}
+            Parent:   llm_call_2
+            Likely cause: Your agent changed the arguments it generates after llm_call_2.
+        """
+        source = self.expected if isinstance(self.expected, dict) else None
+        request = self.actual if isinstance(self.actual, dict) else None
+        anchor = source or request or {}
+
+        event_type = anchor.get("event_type")
+        where = event_type or type(self).__name__.replace("ReplayDivergence", "event")
+        if event_type and self.at_sequence_index is not None:
+            where = f"{event_type}_{self.at_sequence_index}"
+        name = anchor.get("name")
+        header = f"{type(self).__name__} at {where}"
+        if name:
+            header += f": {name}"
+
+        lines = [header]
+        if source is not None and "payload" in source:
+            lines.append(f"Expected: {_compact(source['payload'])}")
+        elif source is not None:
+            lines.append(f"Expected: {_compact(source)}")
+        if request is not None and "payload" in request:
+            lines.append(f"Actual:   {_compact(request['payload'])}")
+        elif request is not None:
+            lines.append(f"Actual:   {_compact(request)}")
+
+        parent = None
+        if self.parent_labels:
+            parent = ", ".join(self.parent_labels)
+        elif isinstance(anchor.get("parent_event_ids"), list) and anchor["parent_event_ids"]:
+            parent = ", ".join(anchor["parent_event_ids"])
+        if parent:
+            lines.append(f"Parent:   {parent}")
+
+        cause = _LIKELY_CAUSES.get(self.reason)
+        if cause is None and self.reason.startswith("semantic"):
+            cause = (
+                "The semantic matcher rejected (or could not judge) the new "
+                "payload against the recorded one."
+            )
+        if cause is not None:
+            lines.append(
+                "Likely cause: " + cause.format(parent=parent or "the previous step")
+            )
+        return "\n".join(lines)
 
     def detail(self) -> dict[str, Any]:
         """Machine-readable divergence detail for reports and CLI output."""

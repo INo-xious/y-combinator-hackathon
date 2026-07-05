@@ -505,5 +505,5 @@ def test_new_names_are_exported_from_the_package():
     from flight_recorder import DagScheduler, SchedulingError  # noqa: F401
 
     for name in ("DagScheduler", "PrematureEventError", "SchedulingError",
-                 "TopologicalReplayer"):
+                 "TopologicalReplayer", "iter_events"):
         assert name in flight_recorder.__all__
