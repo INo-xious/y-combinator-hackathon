@@ -20,14 +20,20 @@ class TraceValidationReport:
     events: int
     hashes_verified: bool
     errors: list[str] = field(default_factory=list)
+    # None means signature verification was not attempted (no signing key);
+    # omitted from to_dict in that case so unsigned output is unchanged.
+    signatures_verified: Optional[bool] = None
 
     def to_dict(self) -> dict[str, Any]:
         if self.valid:
-            return {
+            payload = {
                 "status": "valid",
                 "events": self.events,
                 "hashes_verified": self.hashes_verified,
             }
+            if self.signatures_verified is not None:
+                payload["signatures_verified"] = self.signatures_verified
+            return payload
         return {"status": "invalid", "errors": list(self.errors)}
 
 

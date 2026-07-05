@@ -1,5 +1,6 @@
 """DAG-based flight recorder and local replay system for AI agents (MVP)."""
 
+from .crypto import Cipher, load_fernet_cipher
 from .dag import validate_trace, verify_hashes
 from .errors import (
     FinalOutputMismatch,
@@ -19,7 +20,16 @@ from .events import (
     STATUSES,
     TraceEvent,
 )
-from .hashing import argument_hash, canonical_json, context_hash, validate_json_value
+from .hashing import (
+    FLOAT_POLICIES,
+    FLOAT_POLICY_ALLOW,
+    FLOAT_POLICY_REJECT,
+    argument_hash,
+    canonical_json,
+    context_hash,
+    float_hex,
+    validate_json_value,
+)
 from .loops import LoopRun, LoopStep
 from .recorder import Recorder
 from .replayer import (
@@ -33,13 +43,18 @@ from .replayer import (
     REPLAY_MODES,
 )
 from .report import ReplayReport, TraceValidationReport
+from .signing import resolve_signing_key, sign_event, verify_signatures
 from .storage import TraceWriter, TruncatedTraceWarning, iter_events, read_events
 
 __all__ = [
     "BOUNDARY_EVENT_TYPES",
+    "Cipher",
     "DagScheduler",
     "EVENT_FIELDS",
     "EVENT_TYPES",
+    "FLOAT_POLICIES",
+    "FLOAT_POLICY_ALLOW",
+    "FLOAT_POLICY_REJECT",
     "FinalOutputMismatch",
     "FinalOutputNotCalled",
     "FlightRecorderError",
@@ -68,9 +83,14 @@ __all__ = [
     "argument_hash",
     "canonical_json",
     "context_hash",
+    "float_hex",
     "iter_events",
+    "load_fernet_cipher",
     "read_events",
+    "resolve_signing_key",
+    "sign_event",
     "validate_json_value",
+    "verify_signatures",
     "validate_trace",
     "verify_hashes",
 ]

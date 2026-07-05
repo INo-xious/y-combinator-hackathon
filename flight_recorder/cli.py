@@ -15,11 +15,13 @@ import webbrowser
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
+from .crypto import load_fernet_cipher
 from .dag import validate_trace, verify_hashes
 from .errors import ReplayDivergence
 from .recorder import Recorder
 from .report import TraceValidationReport
 from .replayer import Replayer
+from .signing import resolve_signing_key, verify_signatures
 from .storage import iter_events, read_events
 from .viewer import write_trace_html
 
@@ -124,7 +126,7 @@ def _run_record(trace_file: Path, *, overwrite: bool) -> int:
 
 def _run_replay(trace_file: Path) -> int:
     try:
-        with Replayer(trace_file=trace_file) as replayer:
+        with Replayer(trace_file=trace_file, cipher=load_fernet_cipher()) as replayer:
             _run_demo_agent(replayer, execute_calls=False)
         report = replayer.report
     except ReplayDivergence as exc:
@@ -150,11 +152,24 @@ def _run_replay(trace_file: Path) -> int:
     return 0
 
 
-def _run_validate(trace_file: Path) -> int:
+def _run_validate(trace_file: Path, *, require_signatures: bool = False) -> int:
+    # The signing key only ever comes from the environment: a CLI flag would
+    # leak the secret into shell history and process listings.
+    signing_key = resolve_signing_key(None)
     try:
-        events = read_events(trace_file)
+        # Encrypted traces decrypt with the AGENT_RR_ENCRYPTION_KEY env var;
+        # without it, reading one fails with a message naming that variable.
+        events = read_events(trace_file, cipher=load_fernet_cipher())
         validate_trace(events, require_complete=True)
         verify_hashes(events)
+        signatures_verified: Optional[bool] = None
+        if require_signatures and signing_key is None:
+            raise ValueError(
+                "--require-signatures needs a signing key: set AGENT_RR_SIGNING_KEY"
+            )
+        if signing_key is not None:
+            verify_signatures(events, signing_key, require=require_signatures)
+            signatures_verified = True
     except Exception as exc:
         report = TraceValidationReport(
             valid=False,
@@ -167,7 +182,12 @@ def _run_validate(trace_file: Path) -> int:
         _emit(payload)
         return 1
 
-    report = TraceValidationReport(valid=True, events=len(events), hashes_verified=True)
+    report = TraceValidationReport(
+        valid=True,
+        events=len(events),
+        hashes_verified=True,
+        signatures_verified=signatures_verified,
+    )
     payload = report.to_dict()
     payload["trace_file"] = str(trace_file)
     _emit(payload)
@@ -181,7 +201,7 @@ def _run_view(
     open_browser: bool,
 ) -> int:
     try:
-        events = read_events(trace_file)
+        events = read_events(trace_file, cipher=load_fernet_cipher())
         validate_trace(events, require_complete=True)
         verify_hashes(events)
         html_file = write_trace_html(events, trace_file, output_file)
@@ -230,6 +250,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     validate = subparsers.add_parser("validate", help="validate a trace file and hashes")
     validate.add_argument("trace_file", type=Path)
+    validate.add_argument(
+        "--require-signatures",
+        action="store_true",
+        help="fail unless every event carries a valid HMAC signature "
+        "(key from AGENT_RR_SIGNING_KEY; never a flag, to keep it out of "
+        "shell history)",
+    )
 
     view = subparsers.add_parser(
         "view", help="render the trace's causal DAG to HTML and open it"
@@ -263,7 +290,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "replay":
         return _run_replay(args.trace_file)
     if args.command == "validate":
-        return _run_validate(args.trace_file)
+        return _run_validate(
+            args.trace_file,
+            require_signatures=args.require_signatures,
+        )
     if args.command == "view":
         return _run_view(
             args.trace_file,

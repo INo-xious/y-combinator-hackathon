@@ -97,6 +97,10 @@ class TraceEvent:
     argument_hash: Optional[str]
     context_hash: Optional[str]
     latency_ms: Optional[int]
+    # Optional HMAC-SHA256 signature (signing.py); absent on unsigned traces
+    # and omitted from the JSON line when None, so unsigned output is
+    # byte-identical to pre-signing versions.
+    signature: Optional[str] = None
 
     def validate(self, *, validation_cache: ValidationCache | None = None) -> None:
         """Raise ValueError unless this event satisfies every per-event invariant."""
@@ -188,6 +192,14 @@ class TraceEvent:
         if self.latency_ms is not None and (type(self.latency_ms) is not int or self.latency_ms < 0):
             _fail(f"latency_ms must be null or a non-negative int, got {self.latency_ms!r}")
 
+        if self.signature is not None and (
+            type(self.signature) is not str or not _HEX64_RE.match(self.signature)
+        ):
+            _fail(
+                "signature must be null or a 64-char lowercase hex HMAC-SHA256 "
+                f"digest, got {self.signature!r}"
+            )
+
     def _validate_error_dict(self) -> None:
         if type(self.error) is not dict:
             _fail("error must be a dict when status is 'error'")
@@ -235,27 +247,41 @@ class TraceEvent:
         return asdict(self)
 
     def to_json_dict(self) -> dict:
-        """Project to a shallow, schema-ordered dict for immediate JSON writing."""
-        return {name: getattr(self, name) for name in EVENT_FIELDS}
+        """Project to a shallow, schema-ordered dict for immediate JSON writing.
+
+        Optional fields are omitted when None so unsigned traces stay
+        byte-identical to those written before the field existed.
+        """
+        return {
+            name: getattr(self, name)
+            for name in EVENT_FIELDS
+            if name not in _OPTIONAL_EVENT_FIELDS or getattr(self, name) is not None
+        }
 
     @classmethod
     def from_dict(cls, data: Any) -> "TraceEvent":
         """Build and validate an event from a decoded JSONL object.
 
-        Strict: every schema field must be present and no others.
+        Strict: every schema field must be present (optional fields excepted)
+        and no others.
         """
         if type(data) is not dict:
             _fail(f"event must be a JSON object, got {type(data).__name__}")
-        missing = [name for name in EVENT_FIELDS if name not in data]
+        missing = [
+            name
+            for name in EVENT_FIELDS
+            if name not in data and name not in _OPTIONAL_EVENT_FIELDS
+        ]
         if missing:
             _fail(f"missing fields: {', '.join(missing)}")
         unknown = [key for key in data if key not in _EVENT_FIELD_SET]
         if unknown:
             _fail(f"unknown fields: {', '.join(map(repr, unknown))}")
-        event = cls(**{name: data[name] for name in EVENT_FIELDS})
+        event = cls(**{name: data[name] for name in EVENT_FIELDS if name in data})
         event.validate()
         return event
 
 
 EVENT_FIELDS: tuple[str, ...] = tuple(f.name for f in fields(TraceEvent))
 _EVENT_FIELD_SET = frozenset(EVENT_FIELDS)
+_OPTIONAL_EVENT_FIELDS = frozenset({"signature"})

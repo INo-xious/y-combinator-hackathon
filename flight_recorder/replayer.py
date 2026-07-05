@@ -41,6 +41,7 @@ import builtins
 from pathlib import Path
 from typing import Any, Callable, Optional, Union, Literal, NoReturn
 
+from .crypto import Cipher
 from .dag import validate_trace, verify_hashes
 from .errors import (
     FinalOutputMismatch,
@@ -52,8 +53,9 @@ from .errors import (
     SchedulingError,
 )
 from .events import EVENT_TYPE_METADATA, TraceEvent
-from .hashing import argument_hash
+from .hashing import FLOAT_POLICIES, FLOAT_POLICY_ALLOW, argument_hash
 from .report import ReplayReport
+from .signing import resolve_signing_key, verify_signatures
 from .storage import read_events
 
 
@@ -275,6 +277,10 @@ class Replayer:
         *,
         mode: str = REPLAY_MODE_STRICT,
         semantic_matcher: Optional[Callable[[Any, Any], bool]] = None,
+        float_policy: str = FLOAT_POLICY_ALLOW,
+        signing_key: Union[bytes, str, None] = None,
+        require_signatures: bool = False,
+        cipher: Optional[Cipher] = None,
     ):
         if redactor is not None and not callable(redactor):
             raise TypeError("redactor must be a callable: payload -> redacted_payload")
@@ -282,8 +288,19 @@ class Replayer:
             raise ValueError(f"mode must be one of {REPLAY_MODES}, got {mode!r}")
         if semantic_matcher is not None and not callable(semantic_matcher):
             raise TypeError("semantic_matcher must be callable when provided")
+        if float_policy not in FLOAT_POLICIES:
+            raise ValueError(f"float_policy must be one of {FLOAT_POLICIES}, got {float_policy!r}")
         self._trace_file = Path(trace_file)
         self._redactor = redactor if redactor is not None else _identity
+        self._cipher = cipher
+        self._float_policy = float_policy
+        self._signing_key = resolve_signing_key(signing_key)
+        self._require_signatures = bool(require_signatures)
+        if self._require_signatures and self._signing_key is None:
+            raise ValueError(
+                "require_signatures=True needs a signing key: pass signing_key "
+                "or set AGENT_RR_SIGNING_KEY"
+            )
         self._mode = mode
         self._semantic_matcher = semantic_matcher
         self._events: Optional[list[TraceEvent]] = None
@@ -324,9 +341,11 @@ class Replayer:
             raise LifecycleError(
                 "Replayer context is not reentrant; create a new Replayer per run"
             )
-        events = read_events(self._trace_file)
+        events = read_events(self._trace_file, cipher=self._cipher)
         validate_trace(events)
         verify_hashes(events)
+        if self._signing_key is not None:
+            verify_signatures(events, self._signing_key, require=self._require_signatures)
         self._events = events
         self._run_id = events[0].run_id
         self._entered = True
@@ -447,7 +466,9 @@ class Replayer:
         assert self._events is not None
         # Hashing validates strict JSON before anything else, same as the
         # recorder: an unrecordable payload fails before any comparison.
-        computed_hash = argument_hash(event_type, name, redacted_payload)
+        computed_hash = argument_hash(
+            event_type, name, redacted_payload, float_policy=self._float_policy
+        )
 
         if self._next_index >= len(self._events):
             self._fail_divergence(
@@ -661,12 +682,20 @@ class TopologicalReplayer(Replayer):
         *,
         mode: str = REPLAY_MODE_STRICT,
         semantic_matcher: Optional[Callable[[Any, Any], bool]] = None,
+        float_policy: str = FLOAT_POLICY_ALLOW,
+        signing_key: Union[bytes, str, None] = None,
+        require_signatures: bool = False,
+        cipher: Optional[Cipher] = None,
     ):
         super().__init__(
             trace_file,
             redactor=redactor,
             mode=mode,
             semantic_matcher=semantic_matcher,
+            float_policy=float_policy,
+            signing_key=signing_key,
+            require_signatures=require_signatures,
+            cipher=cipher,
         )
         self._scheduler: Optional[DagScheduler] = None
 
@@ -702,7 +731,9 @@ class TopologicalReplayer(Replayer):
     ) -> TraceEvent:
         assert self._scheduler is not None
         # Hashing validates strict JSON before anything else (recorder parity).
-        computed_hash = argument_hash(event_type, name, redacted_payload)
+        computed_hash = argument_hash(
+            event_type, name, redacted_payload, float_policy=self._float_policy
+        )
         actual = _request_summary(event_type, name, redacted_payload, computed_hash, parents)
 
         pending = self._scheduler.pending

@@ -1,21 +1,25 @@
-"""OpenAI Python SDK integration.
+"""LiteLLM integration: one wrapper for every provider LiteLLM routes to.
 
-Wrap an official SDK client once:
+LiteLLM exposes module-level functions (``litellm.completion(...)``) rather
+than a client object, so this wrapper wraps callables, not attribute paths:
 
-    client = wrap_openai(OpenAI())
+    import litellm
+    from flight_recorder.integrations.litellm import wrap_litellm
 
-Calls to ``client.responses.create(...)``, ``client.chat.completions.create(...)``
-and ``client.embeddings.create(...)`` are recorded/replayed when an Agent-RR
-capture context is active. Outside that context, calls pass through unchanged.
+    llm = wrap_litellm(litellm)      # or wrap_litellm() to import it lazily
+    response = llm.completion(model="gpt-4o-mini", messages=[...])
 
-``stream=True`` calls are supported: chunks are buffered and aggregated
-deterministically during record, and replay yields a synthetic chunk stream
-rebuilt from the aggregate (see ``_streaming.py`` for the contract).
+Calls are recorded/replayed when an Agent-RR capture context is active and
+pass through unchanged outside one. LiteLLM normalizes responses (and
+streaming chunks) to the OpenAI format, so streaming reuses the OpenAI
+chunk aggregation.
+
+TODO: async ``acompletion`` and ``litellm.Router`` support.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from flight_recorder.capture import CapturedResponse, get_active_rr, get_current_parent_ids
 from flight_recorder.capture import set_current_parent_ids
@@ -30,65 +34,73 @@ from ._streaming import (
     synthesize_openai_chunks,
 )
 
-_OPENAI_CREATE_ENDPOINTS = {
-    ("responses", "create"): "openai.responses.create",
-    ("chat", "completions", "create"): "openai.chat.completions.create",
-    ("embeddings", "create"): "openai.embeddings.create",
-}
+
+def wrap_completion(
+    completion: Optional[Callable[..., Any]] = None,
+    *,
+    name: str = "litellm.completion",
+    serializer: Callable[[Any], Any] = to_jsonable,
+    deserializer: Callable[[Any], Any] = from_jsonable,
+) -> Callable[..., Any]:
+    """Wrap ``litellm.completion`` (or a compatible callable) for record/replay."""
+    if completion is None:
+        import litellm  # deferred so the module imports without the dependency
+
+        completion = litellm.completion
+    return _capture_function(completion, name, serializer, deserializer)
 
 
-def wrap_openai(
-    client: Any,
+def wrap_litellm(
+    module: Any = None,
     *,
     serializer: Callable[[Any], Any] = to_jsonable,
     deserializer: Callable[[Any], Any] = from_jsonable,
-) -> Any:
-    """Return a proxy around an OpenAI SDK client."""
+) -> "_LiteLLMProxy":
+    """Return a proxy over the ``litellm`` module with wrapped entry points."""
+    if module is None:
+        import litellm
 
-    return _OpenAIProxy(client, (), serializer, deserializer)
+        module = litellm
+    return _LiteLLMProxy(module, serializer, deserializer)
 
 
-wrap_client = wrap_openai
+wrap_client = wrap_litellm
+
+_LITELLM_ENDPOINTS = {
+    "completion": "litellm.completion",
+    "embedding": "litellm.embedding",
+}
 
 
-class _OpenAIProxy:
+class _LiteLLMProxy:
     def __init__(
         self,
         target: Any,
-        path: tuple[str, ...],
         serializer: Callable[[Any], Any],
         deserializer: Callable[[Any], Any],
     ):
         object.__setattr__(self, "_target", target)
-        object.__setattr__(self, "_path", path)
         object.__setattr__(self, "_serializer", serializer)
         object.__setattr__(self, "_deserializer", deserializer)
 
     def __getattr__(self, name: str) -> Any:
         target_attr = getattr(self._target, name)
-        path = self._path + (name,)
-        endpoint = _OPENAI_CREATE_ENDPOINTS.get(path)
+        endpoint = _LITELLM_ENDPOINTS.get(name)
         if endpoint and callable(target_attr):
-            return _capture_create(
-                target_attr,
-                endpoint,
-                self._serializer,
-                self._deserializer,
+            return _capture_function(
+                target_attr, endpoint, self._serializer, self._deserializer
             )
-        # Only wrap in a proxy if this path is a prefix of a captured endpoint
-        if any(ep_path[:len(path)] == path for ep_path in _OPENAI_CREATE_ENDPOINTS):
-            return _OpenAIProxy(target_attr, path, self._serializer, self._deserializer)
         return target_attr
 
     def __setattr__(self, name: str, value: Any) -> None:
         setattr(self._target, name, value)
 
     def __repr__(self) -> str:
-        return f"<AgentRROpenAIProxy target={self._target!r}>"
+        return f"<AgentRRLiteLLMProxy target={self._target!r}>"
 
 
-def _capture_create(
-    create: Callable[..., Any],
+def _capture_function(
+    func: Callable[..., Any],
     name: str,
     serializer: Callable[[Any], Any],
     deserializer: Callable[[Any], Any],
@@ -96,7 +108,7 @@ def _capture_create(
     def wrapped(*args: Any, **kwargs: Any) -> Any:
         rr = get_active_rr()
         if rr is None:
-            return create(*args, **kwargs)
+            return func(*args, **kwargs)
         streaming = kwargs.get("stream") is True
 
         payload = {"args": serializer(args), "kwargs": serializer(kwargs)}
@@ -104,10 +116,9 @@ def _capture_create(
 
         if streaming:
             def call() -> CapturedResponse:
-                # Buffer-then-yield: the stream is fully consumed here so the
-                # recorder writes one event; only the deterministic aggregate
-                # is stored (chunk boundaries are network noise).
-                raw_chunks = list(create(*args, **kwargs))
+                # LiteLLM chunks are OpenAI-format; same buffer-and-aggregate
+                # contract as the OpenAI wrapper (_streaming.py).
+                raw_chunks = list(func(*args, **kwargs))
                 stored = stream_response(
                     STREAM_KIND_OPENAI,
                     aggregate_openai_chunks(serializer(chunk) for chunk in raw_chunks),
@@ -116,15 +127,14 @@ def _capture_create(
                 return CapturedResponse(raw=ReplayableStream(raw_chunks), stored=stored)
         else:
             def call() -> CapturedResponse:
-                raw = create(*args, **kwargs)
+                raw = func(*args, **kwargs)
                 return CapturedResponse(raw=raw, stored=serializer(raw))
 
         response, event_id = rr.record_llm_call(name, payload, call, parents)
         set_current_parent_ids([event_id])
         if isinstance(response, ReplayableStream):
-            return response  # record path: the buffered original chunks
+            return response
         if is_stream_response(response):
-            # Replay path: rebuild an equivalent chunk stream from the aggregate.
             return ReplayableStream(synthesize_openai_chunks(response["aggregated"]))
         return deserializer(response)
 

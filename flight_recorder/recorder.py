@@ -31,6 +31,19 @@ disk or a hash — but the raw ``call()`` response is still what the agent gets
 back. The recorder-generated metadata payload is not redacted. Pass the same
 redactor to the Replayer for hash parity.
 
+``float_policy="reject"`` refuses float payloads at hashing time for callers
+who need cross-language hash exactness (store ``float_hex`` strings instead);
+pass the same policy to the Replayer, like the redactor.
+
+``signing_key`` (or the ``AGENT_RR_SIGNING_KEY`` env var) enables optional
+HMAC-SHA256 signing: every event gets a ``signature`` field so later
+tampering with the trace file is detectable (see ``signing.py``).
+
+``cipher`` enables optional at-rest payload encryption: hashes and
+signatures are computed over the redacted plaintext as usual, then
+``payload``/``historical_response`` are stored encrypted (see ``crypto.py``).
+Pass the same cipher to the Replayer.
+
 Every event is flushed as soon as it is written, so a crash leaves at most
 one incomplete final line.
 """
@@ -45,6 +58,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, Optional, Union
 
 from .capture import CapturedResponse
+from .crypto import Cipher
 from .errors import FinalOutputNotCalled, LifecycleError
 from .events import (
     EVENT_TYPE_FINAL_OUTPUT,
@@ -58,7 +72,14 @@ from .events import (
     STATUS_OK,
     TraceEvent,
 )
-from .hashing import argument_hash, context_hash, new_validation_cache
+from .hashing import (
+    FLOAT_POLICIES,
+    FLOAT_POLICY_ALLOW,
+    argument_hash,
+    context_hash,
+    new_validation_cache,
+)
+from .signing import resolve_signing_key, sign_event
 from .storage import TraceWriter
 
 
@@ -79,15 +100,24 @@ class Recorder:
         capture_to: Union[str, Path],
         overwrite: bool = False,
         redactor: Optional[Callable[[Any], Any]] = None,
+        *,
+        float_policy: str = FLOAT_POLICY_ALLOW,
+        signing_key: Union[bytes, str, None] = None,
+        cipher: Optional["Cipher"] = None,
     ):
         if type(agent_id) is not str or not agent_id:
             raise ValueError("agent_id must be a non-empty string")
         if redactor is not None and not callable(redactor):
             raise TypeError("redactor must be a callable: payload -> redacted_payload")
+        if float_policy not in FLOAT_POLICIES:
+            raise ValueError(f"float_policy must be one of {FLOAT_POLICIES}, got {float_policy!r}")
         self._agent_id = agent_id
         self._capture_to = Path(capture_to)
         self._overwrite = bool(overwrite)
         self._redactor = redactor if redactor is not None else _identity
+        self._float_policy = float_policy
+        self._signing_key = resolve_signing_key(signing_key)
+        self._cipher = cipher
         self._writer: Optional[TraceWriter] = None
         self._run_id: Optional[str] = None
         self._entered = False
@@ -120,7 +150,9 @@ class Recorder:
             raise LifecycleError(
                 "Recorder context is not reentrant; create a new Recorder per run"
             )
-        self._writer = TraceWriter(self._capture_to, overwrite=self._overwrite)
+        self._writer = TraceWriter(
+            self._capture_to, overwrite=self._overwrite, cipher=self._cipher
+        )
         try:
             self._run_id = str(uuid.uuid4())
             now = _utc_now()
@@ -264,6 +296,7 @@ class Recorder:
             name,
             redacted_payload,
             validation_cache=new_validation_cache(),
+            float_policy=self._float_policy,
         )
 
         started = time.perf_counter()
@@ -351,6 +384,7 @@ class Recorder:
             name,
             payload,
             validation_cache=validation_cache,
+            float_policy=self._float_policy,
         )
         ctx_hash = context_hash(
             parent_context_hashes,
@@ -361,6 +395,7 @@ class Recorder:
             status,
             error,
             validation_cache=validation_cache,
+            float_policy=self._float_policy,
         )
         assert self._run_id is not None
         event = TraceEvent(
@@ -385,6 +420,10 @@ class Recorder:
 
     def _write(self, event: TraceEvent) -> None:
         assert self._writer is not None
+        if self._signing_key is not None:
+            # Signed after hashing: the signature covers the hashes, never
+            # the other way around, so unsigned traces stay byte-identical.
+            event.signature = sign_event(event, self._signing_key)
         self._writer.append(event)  # validates, writes one line, flushes
         if event.context_hash is not None:
             self._context_hashes[event.event_id] = event.context_hash
