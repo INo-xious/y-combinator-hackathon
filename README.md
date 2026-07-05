@@ -73,6 +73,56 @@ with Replayer(trace_file="traces/booking.jsonl") as rr:
 
 Optional integrations wrap popular clients so calls are captured automatically: `flight_recorder.integrations.openai.wrap_openai(...)`, plus Anthropic and LangChain equivalents in `flight_recorder/integrations/`.
 
+### Agent loops / loop engineering
+
+For hand-rolled ReAct loops, use `LoopRun` to keep iteration names and parent
+wiring readable while still writing the same underlying DAG events:
+
+```python
+from flight_recorder import LoopRun
+
+def run_loop_agent(rr, ticket):
+    loop = LoopRun.start(rr, {"ticket": ticket})
+
+    step = loop.step()
+    plan, _ = step.llm(
+        "think",
+        {"iteration": 1, "goal": "choose action"},
+        lambda: model({"ticket": ticket}),
+    )
+    customer, _ = step.tool(
+        "lookup_customer",
+        {"customer_id": plan["customer_id"]},
+        lambda: lookup_customer(plan["customer_id"]),
+    )
+
+    step = loop.step()
+    reply, _ = step.tool(
+        "draft_reply",
+        {"customer_id": customer["id"], "tone": "friendly"},
+        lambda: draft_reply(customer, tone="friendly"),
+    )
+    return loop.final({"reply": reply["text"]})
+```
+
+Boundary names become `step_1.think`, `step_1.lookup_customer`,
+`step_2.draft_reply`, and so on, so drift in a later loop iteration points at
+the exact step that changed. Use `loop.advance([...])` or explicit
+`parent_event_ids` when an iteration fans out into independent tools and then
+joins. If a refactor reorders independent branches, replay with
+`TopologicalReplayer` so any valid DAG order still matches:
+
+```python
+from flight_recorder import TopologicalReplayer
+
+with TopologicalReplayer("traces/support-loop.jsonl") as rr:
+    run_loop_agent(rr, ticket)
+```
+
+See `examples/loop_engineering_demo.py` for a deterministic loop demo that
+records once, replays with poison callables, and then shows a targeted loop
+divergence.
+
 ### 2. Visualize the DAG
 
 ```bash

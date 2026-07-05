@@ -20,6 +20,7 @@ from .events import (
     TraceEvent,
 )
 from .hashing import argument_hash, canonical_json, context_hash, validate_json_value
+from .loops import LoopRun, LoopStep
 from .recorder import Recorder
 from .replayer import (
     DagScheduler,
@@ -43,6 +44,8 @@ __all__ = [
     "FinalOutputNotCalled",
     "FlightRecorderError",
     "LifecycleError",
+    "LoopRun",
+    "LoopStep",
     "PrematureEventError",
     "RECORDER_VERSION",
     "REPLAY_MODE_SEMANTIC",

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flight-recorder"
-version = "0.1.0"
+version = "0.1.1"
 description = "DAG-based flight recorder and local replay system for AI agents (MVP)"
 requires-python = ">=3.10"
 dependencies = []
