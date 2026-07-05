@@ -174,6 +174,7 @@ def test_event_fields_match_plan_order():
         "argument_hash",
         "context_hash",
         "latency_ms",
+        "signature",
     )
 
 

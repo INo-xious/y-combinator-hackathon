@@ -39,6 +39,8 @@ Instead of a flat log, Agent-RR records execution as a Directed Acyclic Graph. E
 
 `context_hash` deliberately excludes diagnostic-only fields such as `error.traceback`, so traces remain stable across machines even when Python traceback paths differ. The traceback is still stored on failed boundary events for debugging; only stable error type/message data participates in the hash chain.
 
+**Floats and determinism.** Hash inputs are canonical JSON: sorted keys, compact separators, and floats in Python's shortest round-trip `repr` — stable across platforms within CPython 3.10+ (`0.1 + 0.2` and `0.30000000000000004` hash identically; `1` vs `1.0` and `0.0` vs `-0.0` intentionally do not). If you need bit-exact floats across languages, store `flight_recorder.float_hex(x)` strings in payloads instead (recover with `float.fromhex`), and pass `float_policy="reject"` to both `Recorder` and `Replayer` to make any stray raw float fail loudly.
+
 ```mermaid
 graph TD
     A[Metadata] --> B[Root Input: 'Summarize customer 123']
@@ -71,7 +73,22 @@ with Replayer(trace_file="traces/booking.jsonl") as rr:
     run_my_agent(rr, query="Book a flight to Tokyo")
 ```
 
-Optional integrations wrap popular clients so calls are captured automatically: `flight_recorder.integrations.openai.wrap_openai(...)`, plus Anthropic and LangChain equivalents in `flight_recorder/integrations/`.
+Optional integrations wrap popular clients so calls are captured automatically: `flight_recorder.integrations.openai.wrap_openai(...)`, plus Anthropic (`wrap_anthropic`), LangChain, LiteLLM (`wrap_litellm` — one wrapper for every provider LiteLLM routes to), and a generic HTTP wrapper for `requests` sessions (`wrap_requests`) in `flight_recorder/integrations/`.
+
+```python
+from flight_recorder.integrations.litellm import wrap_litellm
+from flight_recorder.integrations.requests import wrap_requests
+
+llm = wrap_litellm()                       # record/replay across any LiteLLM provider
+response = llm.completion(model="gpt-4o-mini", messages=[...])
+
+http = wrap_requests(requests.Session())   # generic external API calls, as tool_call events
+orders = http.get("https://api.example.com/orders", timeout=10).json()
+```
+
+The `requests` wrapper records method, URL, params, headers, body, response status/headers/body, and latency; during replay the recorded response is served as a response-like object and **no real network call is made**. Sensitive headers (`Authorization`, `Cookie`, `X-Api-Key`, ...) are redacted by default before hashing or storage — session-level and call-level headers alike.
+
+**Streaming** (`stream=True`) works transparently in the OpenAI, Anthropic, and LiteLLM wrappers: during record the chunks are buffered and folded into one deterministic aggregate (the trace is independent of how the network split the stream), and replay yields a synthetic chunk stream rebuilt from that aggregate — so `for chunk in stream:` code runs identically on both paths without touching the provider. Exact chunk boundaries are not preserved, and first-token latency during record is full-response latency (chunks are buffered before the event is written).
 
 ### Agent loops / loop engineering
 
@@ -230,6 +247,41 @@ with Replayer(trace_file="trace.jsonl", redactor=redact) as rr:
 ```
 
 What's in a trace, exactly? Line-oriented JSON events: payloads and responses (post-redaction), event ids, parent ids, timestamps, and SHA-256 hashes. Run `agent-rr view trace.jsonl` and inspect every node before you commit it.
+
+### Tamper-evident signing (optional)
+
+`verify_hashes` proves a trace is internally consistent, but anyone who edits it can recompute the hashes. With a secret key, every event also gets an HMAC-SHA256 `signature` that an editor cannot forge:
+
+```python
+with Recorder(agent_id="my-agent", capture_to="trace.jsonl",
+              signing_key="my-secret") as rr:          # or AGENT_RR_SIGNING_KEY env var
+    ...
+with Replayer(trace_file="trace.jsonl", signing_key="my-secret",
+              require_signatures=True) as rr:           # rejects unsigned/tampered events
+    ...
+```
+
+`agent-rr validate trace.jsonl --require-signatures` does the same check in CI (key from `AGENT_RR_SIGNING_KEY` only — never a CLI flag, to keep secrets out of shell history). Signing is fully backward compatible: without a key, traces are byte-identical to previous versions, and old unsigned traces still load and validate.
+
+### Encrypting sensitive payloads (optional)
+
+When redaction isn't enough — you need the real prompts for replay but can't store them in plaintext — encrypt payloads and responses at rest. Hashes and signatures are computed over the plaintext, then only the ciphertext hits disk; reading decrypts before validation and replay, so replay semantics are unchanged:
+
+```bash
+pip install "flight-recorder[crypto]"   # optional cryptography dependency (Fernet)
+```
+
+```python
+from flight_recorder import load_fernet_cipher
+
+cipher = load_fernet_cipher(key)  # key kwarg or AGENT_RR_ENCRYPTION_KEY env var
+with Recorder(agent_id="my-agent", capture_to="trace.jsonl", cipher=cipher) as rr:
+    ...
+with Replayer(trace_file="trace.jsonl", cipher=cipher) as rr:
+    ...
+```
+
+Generate a key with `cryptography.fernet.Fernet.generate_key()`. The CLI decrypts via `AGENT_RR_ENCRYPTION_KEY`; reading an encrypted trace without the key fails with a clear error. Any object with `encrypt(text) -> token` / `decrypt(token) -> text` works as a custom cipher (e.g. KMS-backed). Unencrypted traces are untouched — encryption is opt-in and backward compatible.
 
 For large traces, use `flight_recorder.storage.iter_events(path)` to process JSONL line-by-line without loading the full file into memory. `read_events(path)` remains available as the list-returning compatibility helper.
 
