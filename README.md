@@ -285,6 +285,106 @@ Generate a key with `cryptography.fernet.Fernet.generate_key()`. The CLI decrypt
 
 For large traces, use `flight_recorder.storage.iter_events(path)` to process JSONL line-by-line without loading the full file into memory. `read_events(path)` remains available as the list-returning compatibility helper.
 
+## Application / RFS Requirements
+
+Agent-M² can be framed as the deterministic replay and regression testing layer for production AI agents. The technical core is intentionally local-first and developer-owned, but the product surface maps cleanly to a larger reliability platform for teams shipping agents into real workflows.
+
+### Problem Statement and Solution Approach Based on RFS
+
+#### Problem Statement
+
+AI agents are moving from simple chatbots into production systems that call APIs, use tools, update databases, send emails, execute code, and coordinate with other agents. These systems are difficult to debug because their behavior is not fully deterministic: a failed production run cannot always be reproduced by sending the same prompt again.
+
+The core problem is that production AI agent failures are hard to reproduce, verify, and safely regression-test.
+
+Traditional debugging relies on logs, stack traces, fixed inputs, and deterministic test cases. Agents break that model because each run may depend on stochastic model outputs, changing context windows, mutable databases, live third-party APIs, external tool responses, and different execution orders in multi-agent workflows.
+
+This creates three serious engineering risks:
+
+- **Non-reproducible failures.** When an agent fails in production, developers often cannot recreate the exact sequence of LLM calls, tool calls, API responses, and state changes that caused the failure.
+- **Unsafe re-execution.** Re-running the agent may trigger duplicate API calls, repeated database writes, repeated payments, accidental emails, or additional token costs.
+- **Weak regression testing.** Existing observability tools help show what happened, but they do not always let engineers replay the same production failure locally under identical historical conditions.
+
+#### Solution Approach
+
+Agent-M² acts like a flight recorder and replay engine for agent executions. It records an agent run once, stores every important LLM call and tool call as a causal DAG, and allows developers to replay the same run locally without contacting live APIs, databases, or LLM providers.
+
+The approach is based on four principles:
+
+- **Record all non-deterministic boundaries.** Agent-M² captures user input, system prompts, LLM requests, LLM responses, tool calls, tool responses, API/database responses, agent-to-agent messages, state mutations, and error events.
+- **Replay without live infrastructure.** During replay, Agent-M² blocks real network calls and returns historically recorded responses, avoiding new LLM calls, duplicate mutations, accidental emails, webhooks, payments, or extra API charges.
+- **Detect divergence using hashes.** Each recorded event is hashed with canonical JSON. During replay, local events are compared with historical events so the system can identify the exact drift point and the upstream cause.
+- **Support strict and flexible replay.** Strict replay locks down exact reproduction. Structured replay allows value churn while checking schema. Semantic replay can use a domain-specific matcher. Manual injection and sandbox fallback can support safer debugging when live behavior must be explored.
+
+### Overview of the Product, Technology, and Business Model
+
+#### Product Overview
+
+Agent-M² is a developer tool for recording, replaying, validating, and visually inspecting AI agent executions. In practice, it gives teams a way to turn a one-time production or staging run into a reusable regression fixture that can live in git, run in CI, and explain behavior drift when agent code changes.
+
+#### Technology Overview
+
+Agent-M² is a local-first replay engine and flight recorder for autonomous AI systems. Unlike tools that only track linear HTTP traffic, it captures the agent boundary and builds a causal DAG of every model interaction and tool execution.
+
+- **Python core engine.** A lightweight backend orchestrates recording, hashing, storage, validation, and replay using a small Python surface area built for pytest and CI.
+- **Causal DAG recording.** Each trace event includes explicit parent identifiers, so the system knows which earlier outputs triggered subsequent actions.
+- **Cryptographic stability.** Argument hashes and cascading context hashes make upstream changes invalidate downstream nodes while keeping diagnostic-only fields out of the stable hash path.
+- **Topological replay.** Independent DAG branches may resolve in a different order while causal dependencies remain strictly enforced.
+- **Native SDK wrappers.** Built-in interceptors cover OpenAI, Anthropic, LiteLLM, LangChain, streaming calls, and generic `requests` sessions.
+- **Interactive console.** The Next.js dashboard visualizes traces, lets engineers inspect raw JSON payloads, compare expected and actual events, and step through the run.
+
+#### Workflow Integration
+
+Agent-M² fits into a standard engineering cycle:
+
+1. **Record once.** Wrap agent execution and generate a clean JSONL trace in the repository.
+2. **Commit and diff.** Review trace changes in pull requests like any other behavioral fixture.
+3. **Replay at zero cost.** Run deterministic replay in CI without network access or API keys.
+4. **Debug visually.** When replay fails, open the console to inspect the causal graph and locate the upstream drift.
+
+#### Business Model
+
+Agent-M² can start as an open-source developer tool and expand into a commercial reliability platform.
+
+The open-source core can include the recorder SDK, local replay engine, JSONL trace format, CLI validation, basic DAG viewer, and pytest/CI integration. This helps adoption among developers, startups, and AI engineering teams.
+
+A paid cloud or enterprise product can add team trace dashboards, secure trace storage, role-based access control, encrypted traces, GitHub/GitLab CI integration, production trace ingestion, hosted DAG debugging, collaboration workflows, compliance logs, and agent reliability analytics.
+
+Possible revenue streams include SaaS subscriptions, enterprise self-hosted licenses, usage-based trace storage, premium CI/CD integrations, compliance and audit packages, and support contracts.
+
+The strongest business angle is not debugging alone. Agent-M² becomes the regression testing layer for AI agents: every serious team building production agents eventually needs a safe way to reproduce failures, control side effects, and prove that updates did not break recorded behavior.
+
+### Market and User Perspective Assuming Global Expansion
+
+#### Market and Users
+
+The opportunity grows as agents move from demos into production workflows. More agents in production means more failures, higher debugging cost, more need for deterministic replay, and more need for regression testing.
+
+Primary users:
+
+- **AI engineers** need to debug failed agent runs quickly, avoid changing variables, identify where a failure started, and turn production bugs into regression tests.
+- **Platform engineers** need safe infrastructure for agent deployment, network-isolated replay, trace validation in CI, secure storage, and auditability.
+- **CTOs and engineering managers** need confidence that agent systems can be shipped safely, with lower debugging cost, better release confidence, and better governance.
+
+Initial beachhead users include AI startups, developer-tool companies, LLM application teams, agent framework users, and YC-style startups. Expansion markets include financial services, insurance, healthcare administration, customer support automation, enterprise SaaS, legal tech, e-commerce operations, robotics, and autonomous systems.
+
+#### Global Expansion Perspective
+
+Agent reliability is not country-specific. Any company building production agents faces the same constraints: reliability, cost control, compliance, auditability, security, and production debugging.
+
+Regional positioning can adapt to the buyer:
+
+| Region | Strongest angle |
+|--------|-----------------|
+| United States | Developer speed, CI/CD, lower debugging cost |
+| Europe | Privacy, compliance, auditability |
+| Japan | Enterprise automation, reliability, robotics, controlled deployment |
+| Singapore | Regional AI hub and enterprise adoption |
+| Indonesia / Southeast Asia | Cost-efficient AI agent testing without repeated API calls |
+| Middle East | AI infrastructure investment and government digital transformation |
+
+The global positioning is simple: **Agent-M² is the deterministic replay and regression testing layer for production AI agents.**
+
 ## 📚 Learn more
 
 - `examples/` — a runnable demo agent with fake LLM and tools.
